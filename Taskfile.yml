@@ -1,0 +1,44 @@
+version: "3"
+
+tasks:
+  default:
+    cmds:
+      - task: test
+
+  test:
+    desc: Run unit tests
+    cmds:
+      - go test ./pkg/...
+
+  test-integration:
+    desc: Run integration tests (requires Docker)
+    cmds:
+      - task: docker-up
+      - go test ./tests/integration/ -v -timeout 120s
+    status:
+      - docker compose -f docker-compose.test.yml ps --quiet 2>/dev/null | grep -q .
+
+  docker-up:
+    desc: Start test databases
+    cmds:
+      - docker compose -f docker-compose.test.yml up -d --wait
+
+  docker-down:
+    desc: Stop test databases
+    cmds:
+      - docker compose -f docker-compose.test.yml down -v
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  lint:
+    desc: Run linter
+    cmds:
+      - golangci-lint run
+
+  tidy:
+    desc: Tidy modules
+    cmds:
+      - go mod tidy
