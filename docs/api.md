@@ -59,11 +59,41 @@ const (
 )
 ```
 
+### `LimitStyle`
+
+```go
+const (
+    LimitOffsetStyle  LimitStyle = iota  // LIMIT X OFFSET Y (MySQL, PostgreSQL, SQLite)
+    FetchNextStyle                        // OFFSET X ROWS FETCH NEXT Y ROWS ONLY (SQL Server)
+)
+```
+
+### `Dialect` Interface
+
+```go
+type Dialect interface {
+    BuildSelect(q *SelectQuery) (string, []interface{})
+    BuildInsert(q *InsertQuery) (string, []interface{})
+    BuildUpdate(q *UpdateQuery) (string, []interface{})
+    BuildDelete(q *DeleteQuery) (string, []interface{})
+}
+```
+
+### `BaseDialect`
+
+Common SQL generation used by all built-in drivers. Embed and override for databases with additional quirks.
+
+```go
+d := &dal.BaseDialect{
+    PlaceholderStyle: dal.QuestionMark,
+    LimitStyle:       dal.LimitOffsetStyle,
+}
+```
+
 ### `QueryBuilder`
 
 ```go
-qb := dal.NewQueryBuilder()                      // defaults to ?
-qb := dal.NewQueryBuilderWithStyle(dal.Dollar)    // for PostgreSQL
+qb := dal.NewQueryBuilder(dialect)  // requires a Dialect
 ```
 
 | Method | Returns | Description |
@@ -108,11 +138,11 @@ qb := dal.NewQueryBuilderWithStyle(dal.Dollar)    // for PostgreSQL
 
 ## Driver Packages
 
-Each provides `NewXxxDB(db *sql.DB, log ...dal.Logger)` and `NewQueryBuilder()`.
+Each provides `NewXxxDB(db *sql.DB, log ...dal.Logger)`, `NewDialect() dal.Dialect`, and `NewQueryBuilder() *dal.QueryBuilder`.
 
-| Package | DB Type | Placeholder |
-|---------|---------|-------------|
-| `pkg/mysql` | `MySQLDB` | `?` |
-| `pkg/postgres` | `PostgresDB` | `$1, $2, ...` |
-| `pkg/sqlite` | `SQLiteDB` | `?` |
-| `pkg/mssql` | `MSSQLDB` | `@p1, @p2, ...` |
+| Package | DB Type | Placeholder | Dialect |
+|---------|---------|-------------|---------|
+| `pkg/mysql` | `MySQLDB` | `?` | `LimitOffsetStyle` |
+| `pkg/postgres` | `PostgresDB` | `$1, $2, ...` | `LimitOffsetStyle` |
+| `pkg/sqlite` | `SQLiteDB` | `?` | `LimitOffsetStyle` |
+| `pkg/mssql` | `MSSQLDB` | `@p1, @p2, ...` | `FetchNextStyle` |

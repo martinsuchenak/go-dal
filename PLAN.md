@@ -32,7 +32,7 @@ GO-DAL is a lightweight, interface-driven database abstraction layer for Go that
 - [x] SQLite driver wrapper (`pkg/sqlite`) -- `?` placeholders
 - [x] SQL Server driver wrapper (`pkg/mssql`) -- `@p1, @p2, ...` placeholders
 - [x] Compile-time interface compliance checks for all drivers
-- [x] Each driver provides `NewQueryBuilder()` pre-configured with correct style
+- [x] Each driver provides `NewQueryBuilder()` pre-configured with correct dialect
 - [x] Shared `BaseDB` in `pkg/dal` eliminates duplication across drivers
 
 ## Phase 5: Logging Layer
@@ -45,28 +45,30 @@ GO-DAL is a lightweight, interface-driven database abstraction layer for Go that
 - [x] Runtime logger change via `SetLogger(logger)` -- pass nil to disable
 - [x] Access underlying `*sql.DB` via `DB()` method
 
-## Phase 6: Testing
-- [x] Unit tests for SELECT (basic, star, multiple WHERE, offset)
-- [x] Unit tests for INSERT (basic, empty)
-- [x] Unit tests for UPDATE (basic, multiple SET, empty)
-- [x] Unit tests for DELETE (basic, all, multiple WHERE)
-- [x] Unit tests for `$1, $2...` placeholder style (SELECT, INSERT, UPDATE, DELETE)
-- [x] Unit tests for `@p1, @p2...` placeholder style (SELECT, INSERT, UPDATE, DELETE)
-- [x] Unit tests for quote-aware replacement (single, double, escaped quotes, multi-clause)
-- [x] Unit tests for all 4 driver packages (placeholder style, interface compliance)
-- [x] Unit tests for logging (Exec, Query, QueryRow, BeginTx, Close, error logging)
-- [x] Unit tests for NoopLogger, nil defaults, SetLogger, duration logging
-- [x] Integration tests using real SQLite (via modernc.org/sqlite)
-- [ ] Integration tests for MySQL, PostgreSQL, SQL Server
+## Phase 6: Dialect Architecture
+- [x] `Dialect` interface with BuildSelect/BuildInsert/BuildUpdate/BuildDelete
+- [x] `BaseDialect` with configurable PlaceholderStyle + LimitStyle
+- [x] `LimitStyle`: LimitOffsetStyle (MySQL/PostgreSQL/SQLite) and FetchNextStyle (MSSQL)
+- [x] Each driver provides `NewDialect()` returning a configured `BaseDialect`
+- [x] Query structs hold a `Dialect` reference, `Build()` delegates to dialect
+- [x] Extensible: new databases = implement Dialect, zero changes to shared code
 
-## Phase 7: Documentation
-- [x] README with installation, quick start, query builder, and logging examples
+## Phase 7: Testing
+- [x] Unit tests for SELECT, INSERT, UPDATE, DELETE (all placeholder styles)
+- [x] Unit tests for quote-aware replacement
+- [x] Unit tests for all 4 driver packages
+- [x] Unit tests for logging layer
+- [x] Unit tests for MSSQL LIMIT/OFFSET dialect
+- [x] Integration tests across SQLite, MySQL, PostgreSQL, MSSQL (CRUD, JOINs, aggregation, transactions)
+- [x] Runnable Go examples (query builder, SQLite CRUD, placeholder styles)
+
+## Phase 8: Documentation
+- [x] README with installation, quick start, query builder, logging, dialect examples
 - [x] API reference in `docs/api.md`
-- [ ] Add GoDoc comments to all exported types and methods
-- [ ] Add runnable examples for each database driver
+- [x] GoDoc comments on all exported types and methods
 
-## Phase 8: Finalization
-- [ ] Review code quality and performance
-- [ ] Ensure cross-database compatibility (SQL dialect differences beyond placeholders)
-- [ ] Run full test suite
+## Phase 9: Finalization
+- [x] Dialect architecture refactored from monolithic Build()
+- [x] Cross-database compatibility (MSSQL FETCH NEXT dialect)
+- [x] Full test suite passing (58 unit + 8 examples + 19 integration)
 - [ ] Tag initial release

@@ -1,3 +1,4 @@
+// Package mssql provides a SQL Server driver wrapper for the go-dal database abstraction layer.
 package mssql
 
 import (
@@ -7,12 +8,15 @@ import (
 	"github.com/martinsuchenak/go-dal/pkg/dal"
 )
 
+// Compile-time check that MSSQLDB implements DBInterface.
 var _ dal.DBInterface = (*MSSQLDB)(nil)
 
+// MSSQLDB wraps a *sql.DB with SQL Server-specific query building and optional logging.
 type MSSQLDB struct {
 	*dal.BaseDB
 }
 
+// NewMSSQLDB creates a new MSSQLDB. An optional Logger can be provided for query logging.
 func NewMSSQLDB(db *sql.DB, log ...dal.Logger) *MSSQLDB {
 	var logger dal.Logger
 	if len(log) > 0 {
@@ -41,6 +45,7 @@ func (m *MSSQLDB) Close() error {
 	return m.BaseDB.Close()
 }
 
+// NewQueryBuilder returns a QueryBuilder configured for SQL Server ("@p1, @p2, ..." placeholders).
 func NewQueryBuilder() *dal.QueryBuilder {
-	return dal.NewQueryBuilderWithStyle(dal.AtPNumber)
+	return dal.NewQueryBuilder(NewDialect())
 }

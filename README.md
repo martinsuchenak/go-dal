@@ -9,6 +9,7 @@ GO-DAL is a lightweight, interface-driven database abstraction layer for Go. Wri
 - Fluent query builder with deterministic output
 - Database driver wrapper for executing queries and scanning results
 - Automatic placeholder conversion (`?`, `$1`, `@p1`) per database dialect
+- Dialect interface for extensible SQL generation — add new databases without modifying shared code
 - Quote-aware placeholder replacement (skips `?` inside string literals)
 - Injectable structured logger (compatible with `github.com/fortix/go-libs/logger`)
 
@@ -129,7 +130,16 @@ The `dal.Logger` interface is structurally identical to `logger.Logger` -- no ad
 
 ## Query Builder
 
-Each driver package provides `NewQueryBuilder()` pre-configured with the correct placeholder style.
+Each driver package provides `NewQueryBuilder()` pre-configured with the correct dialect. Under the hood, each driver creates a `Dialect` that controls SQL generation:
+
+```go
+// Using a driver package (recommended):
+qb := mysql.NewQueryBuilder()
+
+// Or create a QueryBuilder directly with a dialect:
+d := &dal.BaseDialect{PlaceholderStyle: dal.QuestionMark, LimitStyle: dal.LimitOffsetStyle}
+qb := dal.NewQueryBuilder(d)
+```
 
 ### SELECT
 
@@ -172,14 +182,39 @@ qb.Delete("users").Build()  // DELETE FROM users
 
 ## Database Drivers
 
-| Package | Placeholder Style | Constructor |
-|---------|-------------------|-------------|
-| `pkg/mysql` | `?` | `NewMySQLDB(db *sql.DB, log ...dal.Logger)` |
-| `pkg/postgres` | `$1, $2, ...` | `NewPostgresDB(db *sql.DB, log ...dal.Logger)` |
-| `pkg/sqlite` | `?` | `NewSQLiteDB(db *sql.DB, log ...dal.Logger)` |
-| `pkg/mssql` | `@p1, @p2, ...` | `NewMSSQLDB(db *sql.DB, log ...dal.Logger)` |
+| Package | Placeholder Style | LIMIT/OFFSET | Constructor |
+|---------|-------------------|--------------|-------------|
+| `pkg/mysql` | `?` | `LIMIT X OFFSET Y` | `NewMySQLDB(db *sql.DB, log ...dal.Logger)` |
+| `pkg/postgres` | `$1, $2, ...` | `LIMIT X OFFSET Y` | `NewPostgresDB(db *sql.DB, log ...dal.Logger)` |
+| `pkg/sqlite` | `?` | `LIMIT X OFFSET Y` | `NewSQLiteDB(db *sql.DB, log ...dal.Logger)` |
+| `pkg/mssql` | `@p1, @p2, ...` | `OFFSET X ROWS FETCH NEXT Y ROWS ONLY` | `NewMSSQLDB(db *sql.DB, log ...dal.Logger)` |
 
 All drivers implement `dal.DBInterface` and support `SetLogger(dal.Logger)`.
+
+## Dialect Interface
+
+For databases not yet supported, implement the `dal.Dialect` interface:
+
+```go
+type Dialect interface {
+    BuildSelect(q *SelectQuery) (string, []interface{})
+    BuildInsert(q *InsertQuery) (string, []interface{})
+    BuildUpdate(q *UpdateQuery) (string, []interface{})
+    BuildDelete(q *DeleteQuery) (string, []interface{})
+}
+```
+
+`BaseDialect` handles the common case — embed it and override only what differs:
+
+```go
+type MyDialect struct {
+    dal.BaseDialect
+}
+
+func (d *MyDialect) BuildSelect(q *dal.SelectQuery) (string, []interface{}) {
+    // custom SELECT rendering
+}
+```
 
 ## Development
 

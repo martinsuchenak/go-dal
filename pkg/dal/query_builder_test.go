@@ -4,8 +4,20 @@ import (
 	"testing"
 )
 
+func defaultDialect() Dialect {
+	return &BaseDialect{PlaceholderStyle: QuestionMark, LimitStyle: LimitOffsetStyle}
+}
+
+func dollarDialect() Dialect {
+	return &BaseDialect{PlaceholderStyle: DollarNumber, LimitStyle: LimitOffsetStyle}
+}
+
+func atPDialect() Dialect {
+	return &BaseDialect{PlaceholderStyle: AtPNumber, LimitStyle: FetchNextStyle}
+}
+
 func TestSelectBasic(t *testing.T) {
-	qb := NewQueryBuilder()
+	qb := NewQueryBuilder(defaultDialect())
 	query, args := qb.Select("id", "name").
 		From("users").
 		Where("age > ?", 18).
@@ -19,7 +31,7 @@ func TestSelectBasic(t *testing.T) {
 }
 
 func TestSelectStar(t *testing.T) {
-	qb := NewQueryBuilder()
+	qb := NewQueryBuilder(defaultDialect())
 	query, args := qb.Select().From("users").Build()
 
 	assertQuery(t, query, "SELECT * FROM users")
@@ -29,7 +41,7 @@ func TestSelectStar(t *testing.T) {
 }
 
 func TestSelectMultipleWhere(t *testing.T) {
-	qb := NewQueryBuilder()
+	qb := NewQueryBuilder(defaultDialect())
 	query, args := qb.Select("id", "name").
 		From("users").
 		Where("age > ?", 18).
@@ -41,13 +53,13 @@ func TestSelectMultipleWhere(t *testing.T) {
 }
 
 func TestSelectOffset(t *testing.T) {
-	qb := NewQueryBuilder()
+	qb := NewQueryBuilder(defaultDialect())
 	query, _ := qb.Select("id").From("users").Limit(10).Offset(20).Build()
 	assertQuery(t, query, "SELECT id FROM users LIMIT 10 OFFSET 20")
 }
 
 func TestInsert(t *testing.T) {
-	qb := NewQueryBuilder()
+	qb := NewQueryBuilder(defaultDialect())
 	query, args := qb.Insert("users").
 		Set("name", "John Doe").
 		Set("email", "john@example.com").
@@ -66,7 +78,7 @@ func TestInsert(t *testing.T) {
 }
 
 func TestInsertEmpty(t *testing.T) {
-	qb := NewQueryBuilder()
+	qb := NewQueryBuilder(defaultDialect())
 	query, args := qb.Insert("users").Build()
 	assertQuery(t, query, "")
 	if args != nil {
@@ -75,7 +87,7 @@ func TestInsertEmpty(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	qb := NewQueryBuilder()
+	qb := NewQueryBuilder(defaultDialect())
 	query, args := qb.Update("users").
 		Set("email", "new@example.com").
 		Where("id = ?", 123).
@@ -86,7 +98,7 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestUpdateMultipleSet(t *testing.T) {
-	qb := NewQueryBuilder()
+	qb := NewQueryBuilder(defaultDialect())
 	query, args := qb.Update("users").
 		Set("name", "Jane").
 		Set("email", "jane@example.com").
@@ -100,7 +112,7 @@ func TestUpdateMultipleSet(t *testing.T) {
 }
 
 func TestUpdateEmpty(t *testing.T) {
-	qb := NewQueryBuilder()
+	qb := NewQueryBuilder(defaultDialect())
 	query, args := qb.Update("users").Build()
 	assertQuery(t, query, "")
 	if args != nil {
@@ -109,14 +121,14 @@ func TestUpdateEmpty(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	qb := NewQueryBuilder()
+	qb := NewQueryBuilder(defaultDialect())
 	query, args := qb.Delete("users").Where("id = ?", 123).Build()
 	assertQuery(t, query, "DELETE FROM users WHERE id = ?")
 	assertArgs(t, args, 123)
 }
 
 func TestDeleteAll(t *testing.T) {
-	qb := NewQueryBuilder()
+	qb := NewQueryBuilder(defaultDialect())
 	query, args := qb.Delete("users").Build()
 	assertQuery(t, query, "DELETE FROM users")
 	if len(args) != 0 {
@@ -125,7 +137,7 @@ func TestDeleteAll(t *testing.T) {
 }
 
 func TestDeleteMultipleWhere(t *testing.T) {
-	qb := NewQueryBuilder()
+	qb := NewQueryBuilder(defaultDialect())
 	query, args := qb.Delete("users").
 		Where("active = ?", false).
 		Where("created_at < ?", "2020-01-01").
@@ -137,10 +149,8 @@ func TestDeleteMultipleWhere(t *testing.T) {
 	}
 }
 
-// Placeholder style tests
-
 func TestDollarPlaceholders(t *testing.T) {
-	qb := NewQueryBuilderWithStyle(DollarNumber)
+	qb := NewQueryBuilder(dollarDialect())
 
 	query, args := qb.Select("id").
 		From("users").
@@ -153,7 +163,7 @@ func TestDollarPlaceholders(t *testing.T) {
 }
 
 func TestDollarInsert(t *testing.T) {
-	qb := NewQueryBuilderWithStyle(DollarNumber)
+	qb := NewQueryBuilder(dollarDialect())
 	query, args := qb.Insert("users").
 		Set("name", "John").
 		Set("email", "john@example.com").
@@ -164,7 +174,7 @@ func TestDollarInsert(t *testing.T) {
 }
 
 func TestDollarUpdate(t *testing.T) {
-	qb := NewQueryBuilderWithStyle(DollarNumber)
+	qb := NewQueryBuilder(dollarDialect())
 	query, args := qb.Update("users").
 		Set("name", "Jane").
 		Where("id = ?", 1).
@@ -175,7 +185,7 @@ func TestDollarUpdate(t *testing.T) {
 }
 
 func TestDollarDelete(t *testing.T) {
-	qb := NewQueryBuilderWithStyle(DollarNumber)
+	qb := NewQueryBuilder(dollarDialect())
 	query, args := qb.Delete("users").
 		Where("id = ?", 1).
 		Build()
@@ -185,7 +195,7 @@ func TestDollarDelete(t *testing.T) {
 }
 
 func TestAtPPlaceholders(t *testing.T) {
-	qb := NewQueryBuilderWithStyle(AtPNumber)
+	qb := NewQueryBuilder(atPDialect())
 
 	query, args := qb.Select("id").
 		From("users").
@@ -198,7 +208,7 @@ func TestAtPPlaceholders(t *testing.T) {
 }
 
 func TestAtPInsert(t *testing.T) {
-	qb := NewQueryBuilderWithStyle(AtPNumber)
+	qb := NewQueryBuilder(atPDialect())
 	query, args := qb.Insert("users").
 		Set("name", "John").
 		Set("email", "john@example.com").
@@ -209,7 +219,7 @@ func TestAtPInsert(t *testing.T) {
 }
 
 func TestAtPUpdate(t *testing.T) {
-	qb := NewQueryBuilderWithStyle(AtPNumber)
+	qb := NewQueryBuilder(atPDialect())
 	query, args := qb.Update("users").
 		Set("name", "Jane").
 		Set("email", "jane@ex.com").
@@ -223,14 +233,14 @@ func TestAtPUpdate(t *testing.T) {
 }
 
 func TestAtPDelete(t *testing.T) {
-	qb := NewQueryBuilderWithStyle(AtPNumber)
+	qb := NewQueryBuilder(atPDialect())
 	query, args := qb.Delete("users").Where("id = ?", 1).Build()
 	assertQuery(t, query, "DELETE FROM users WHERE id = @p1")
 	assertArgs(t, args, 1)
 }
 
 func TestDollarWhereSkipsQuotedQuestionMarks(t *testing.T) {
-	qb := NewQueryBuilderWithStyle(DollarNumber)
+	qb := NewQueryBuilder(dollarDialect())
 	query, args := qb.Select("id").
 		From("users").
 		Where("name = '?' AND id = ?", 42).
@@ -241,7 +251,7 @@ func TestDollarWhereSkipsQuotedQuestionMarks(t *testing.T) {
 }
 
 func TestDollarWhereDoubleQuoted(t *testing.T) {
-	qb := NewQueryBuilderWithStyle(DollarNumber)
+	qb := NewQueryBuilder(dollarDialect())
 	query, args := qb.Select("id").
 		From("users").
 		Where("col = \"?\" AND val = ?", 99).
@@ -252,7 +262,7 @@ func TestDollarWhereDoubleQuoted(t *testing.T) {
 }
 
 func TestDollarWhereEscapedQuotes(t *testing.T) {
-	qb := NewQueryBuilderWithStyle(DollarNumber)
+	qb := NewQueryBuilder(dollarDialect())
 	query, args := qb.Select("id").
 		From("users").
 		Where("name = 'it''s ?' AND val = ?", 7).
@@ -263,7 +273,7 @@ func TestDollarWhereEscapedQuotes(t *testing.T) {
 }
 
 func TestDollarWhereMultipleParamsAcrossClauses(t *testing.T) {
-	qb := NewQueryBuilderWithStyle(DollarNumber)
+	qb := NewQueryBuilder(dollarDialect())
 	query, args := qb.Select("id").
 		From("users").
 		Where("age > ?", 18).
@@ -275,7 +285,7 @@ func TestDollarWhereMultipleParamsAcrossClauses(t *testing.T) {
 }
 
 func TestDollarUpdateWithQuotedPlaceholder(t *testing.T) {
-	qb := NewQueryBuilderWithStyle(DollarNumber)
+	qb := NewQueryBuilder(dollarDialect())
 	query, args := qb.Update("users").
 		Set("name", "Jane").
 		Where("col = '?' AND id = ?", 1).
@@ -288,7 +298,7 @@ func TestDollarUpdateWithQuotedPlaceholder(t *testing.T) {
 }
 
 func TestDollarDeleteWithQuotedPlaceholder(t *testing.T) {
-	qb := NewQueryBuilderWithStyle(DollarNumber)
+	qb := NewQueryBuilder(dollarDialect())
 	query, args := qb.Delete("users").
 		Where("col = '?' AND id = ?", 1).
 		Build()
@@ -298,7 +308,7 @@ func TestDollarDeleteWithQuotedPlaceholder(t *testing.T) {
 }
 
 func TestSelectJoin(t *testing.T) {
-	qb := NewQueryBuilder()
+	qb := NewQueryBuilder(defaultDialect())
 	query, args := qb.Select("u.id", "u.name", "o.total").
 		From("users u").
 		Join("INNER JOIN orders o ON o.user_id = u.id").
@@ -310,7 +320,7 @@ func TestSelectJoin(t *testing.T) {
 }
 
 func TestSelectMultipleJoins(t *testing.T) {
-	qb := NewQueryBuilder()
+	qb := NewQueryBuilder(defaultDialect())
 	query, _ := qb.Select("u.name", "o.total", "p.name").
 		From("users u").
 		Join("INNER JOIN orders o ON o.user_id = u.id").
@@ -321,7 +331,7 @@ func TestSelectMultipleJoins(t *testing.T) {
 }
 
 func TestSelectGroupBy(t *testing.T) {
-	qb := NewQueryBuilder()
+	qb := NewQueryBuilder(defaultDialect())
 	query, args := qb.Select("u.id", "COUNT(o.id) as order_count").
 		From("users u").
 		Join("LEFT JOIN orders o ON o.user_id = u.id").
@@ -335,7 +345,7 @@ func TestSelectGroupBy(t *testing.T) {
 }
 
 func TestSelectGroupByHaving(t *testing.T) {
-	qb := NewQueryBuilder()
+	qb := NewQueryBuilder(defaultDialect())
 	query, args := qb.Select("u.id", "COUNT(o.id) as order_count").
 		From("users u").
 		Join("LEFT JOIN orders o ON o.user_id = u.id").
@@ -348,7 +358,7 @@ func TestSelectGroupByHaving(t *testing.T) {
 }
 
 func TestSelectJoinWhereGroupByHavingOrderByLimit(t *testing.T) {
-	qb := NewQueryBuilder()
+	qb := NewQueryBuilder(defaultDialect())
 	query, args := qb.Select("u.name", "SUM(o.amount) as total_spent").
 		From("users u").
 		Join("INNER JOIN orders o ON o.user_id = u.id").
@@ -364,7 +374,7 @@ func TestSelectJoinWhereGroupByHavingOrderByLimit(t *testing.T) {
 }
 
 func TestSelectGroupByHavingDollarPlaceholders(t *testing.T) {
-	qb := NewQueryBuilderWithStyle(DollarNumber)
+	qb := NewQueryBuilder(dollarDialect())
 	query, args := qb.Select("u.id", "COUNT(o.id)").
 		From("users u").
 		Join("LEFT JOIN orders o ON o.user_id = u.id").
@@ -375,6 +385,51 @@ func TestSelectGroupByHavingDollarPlaceholders(t *testing.T) {
 
 	assertQuery(t, query, "SELECT u.id, COUNT(o.id) FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE u.active = $1 GROUP BY u.id HAVING COUNT(o.id) > $2")
 	assertArgs(t, args, true, 5)
+}
+
+func TestMSSQLLimitOffsetWithOrderBy(t *testing.T) {
+	qb := NewQueryBuilder(atPDialect())
+	query, _ := qb.Select("id", "name").
+		From("users").
+		OrderBy("name").
+		Limit(10).
+		Offset(20).
+		Build()
+
+	assertQuery(t, query, "SELECT id, name FROM users ORDER BY name OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY")
+}
+
+func TestMSSQLLimitOnly(t *testing.T) {
+	qb := NewQueryBuilder(atPDialect())
+	query, _ := qb.Select("id").
+		From("users").
+		OrderBy("id").
+		Limit(5).
+		Build()
+
+	assertQuery(t, query, "SELECT id FROM users ORDER BY id OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY")
+}
+
+func TestMSSQLOffsetOnly(t *testing.T) {
+	qb := NewQueryBuilder(atPDialect())
+	query, _ := qb.Select("id").
+		From("users").
+		OrderBy("id").
+		Offset(10).
+		Build()
+
+	assertQuery(t, query, "SELECT id FROM users ORDER BY id OFFSET 10 ROWS")
+}
+
+func TestMSSQLLimitOffsetWithoutOrderBy(t *testing.T) {
+	qb := NewQueryBuilder(atPDialect())
+	query, _ := qb.Select("id").
+		From("users").
+		Limit(10).
+		Offset(5).
+		Build()
+
+	assertQuery(t, query, "SELECT id FROM users ORDER BY (SELECT NULL) OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY")
 }
 
 func assertQuery(t *testing.T, got, want string) {

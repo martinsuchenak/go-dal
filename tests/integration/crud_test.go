@@ -161,9 +161,6 @@ func TestDelete(t *testing.T) {
 
 func TestSelectWithLimitOffset(t *testing.T) {
 	runForEachDBWithSeed(t, func(t *testing.T, td *testDB) {
-		if td.name == "mssql" {
-			t.Skip("MSSQL does not support LIMIT/OFFSET syntax")
-		}
 		ctx := context.Background()
 		qb := td.builder()
 

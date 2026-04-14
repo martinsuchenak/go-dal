@@ -45,28 +45,31 @@ type SelectQuery struct {
 	orderBy []string
 	limit   *int64
 	offset  *int64
-	style   PlaceholderStyle
+	dialect Dialect
 }
 
+// InsertQuery builds an INSERT statement using a fluent API.
 type InsertQuery struct {
-	table  string
-	keys   []string
-	values []interface{}
-	style  PlaceholderStyle
+	table   string
+	keys    []string
+	values  []interface{}
+	dialect Dialect
 }
 
+// UpdateQuery builds an UPDATE statement using a fluent API.
 type UpdateQuery struct {
-	table  string
-	keys   []string
-	values []interface{}
-	wheres []whereClause
-	style  PlaceholderStyle
+	table   string
+	keys    []string
+	values  []interface{}
+	wheres  []whereClause
+	dialect Dialect
 }
 
+// DeleteQuery builds a DELETE statement using a fluent API.
 type DeleteQuery struct {
-	table  string
-	wheres []whereClause
-	style  PlaceholderStyle
+	table   string
+	wheres  []whereClause
+	dialect Dialect
 }
 
 type whereClause struct {

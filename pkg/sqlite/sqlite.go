@@ -1,3 +1,4 @@
+// Package sqlite provides a SQLite driver wrapper for the go-dal database abstraction layer.
 package sqlite
 
 import (
@@ -7,12 +8,15 @@ import (
 	"github.com/martinsuchenak/go-dal/pkg/dal"
 )
 
+// Compile-time check that SQLiteDB implements DBInterface.
 var _ dal.DBInterface = (*SQLiteDB)(nil)
 
+// SQLiteDB wraps a *sql.DB with SQLite-specific query building and optional logging.
 type SQLiteDB struct {
 	*dal.BaseDB
 }
 
+// NewSQLiteDB creates a new SQLiteDB. An optional Logger can be provided for query logging.
 func NewSQLiteDB(db *sql.DB, log ...dal.Logger) *SQLiteDB {
 	var logger dal.Logger
 	if len(log) > 0 {
@@ -41,6 +45,7 @@ func (s *SQLiteDB) Close() error {
 	return s.BaseDB.Close()
 }
 
+// NewQueryBuilder returns a QueryBuilder configured for SQLite ("?" placeholders).
 func NewQueryBuilder() *dal.QueryBuilder {
-	return dal.NewQueryBuilder()
+	return dal.NewQueryBuilder(NewDialect())
 }
