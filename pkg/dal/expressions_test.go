@@ -134,10 +134,130 @@ func TestTranslateSQLViaQueryBuilder(t *testing.T) {
 	}
 }
 
+func TestQueryBuilderConcatExpr(t *testing.T) {
+	qb := NewQueryBuilder(&BaseDialect{})
+	got := qb.ConcatExpr("a", "b")
+	if got != "CONCAT(a, b)" {
+		t.Errorf("got %q, want CONCAT(a, b)", got)
+	}
+}
+
+func TestQueryBuilderLengthExpr(t *testing.T) {
+	qb := NewQueryBuilder(&BaseDialect{})
+	got := qb.LengthExpr("name")
+	if got != "LENGTH(name)" {
+		t.Errorf("got %q, want LENGTH(name)", got)
+	}
+}
+
+func TestQueryBuilderCurrentTimestamp(t *testing.T) {
+	qb := NewQueryBuilder(&BaseDialect{})
+	if got := qb.CurrentTimestamp(); got != "NOW()" {
+		t.Errorf("got %q, want NOW()", got)
+	}
+}
+
+func TestQueryBuilderBoolLiteral(t *testing.T) {
+	qb := NewQueryBuilder(&BaseDialect{})
+	if got := qb.BoolLiteral(true); got != "TRUE" {
+		t.Errorf("got %q, want TRUE", got)
+	}
+	if got := qb.BoolLiteral(false); got != "FALSE" {
+		t.Errorf("got %q, want FALSE", got)
+	}
+}
+
+func TestQueryBuilderStringAggExpr(t *testing.T) {
+	qb := NewQueryBuilder(&BaseDialect{})
+	got := qb.StringAggExpr("name", "', '")
+	if got != "GROUP_CONCAT(name SEPARATOR ', ')" {
+		t.Errorf("got %q, want GROUP_CONCAT(name SEPARATOR ', ')", got)
+	}
+}
+
+func TestQueryBuilderRandExpr(t *testing.T) {
+	qb := NewQueryBuilder(&BaseDialect{})
+	if got := qb.RandExpr(); got != "RAND()" {
+		t.Errorf("got %q, want RAND()", got)
+	}
+}
+
 func TestTranslateSQLSubquery(t *testing.T) {
 	d := &BaseDialect{Placeholder: DollarPlaceholder}
 	got := d.TranslateSQL("SELECT EXISTS(SELECT 1 FROM users WHERE email = ? AND active = ?)")
 	want := "SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 AND active = $2)"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTranslateSQLDoubleQuoteEscape(t *testing.T) {
+	d := &BaseDialect{Placeholder: DollarPlaceholder}
+	got := d.TranslateSQL(`SELECT ? WHERE x = "he said ""what?""" AND y = ?`)
+	want := `SELECT $1 WHERE x = "he said ""what?""" AND y = $2`
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTranslateSQLBackslashInDoubleQuote(t *testing.T) {
+	d := &BaseDialect{Placeholder: DollarPlaceholder, BackslashEscapes: true}
+	got := d.TranslateSQL(`SELECT ? WHERE x = "line1\"line2" AND y = ?`)
+	want := `SELECT $1 WHERE x = "line1\"line2" AND y = $2`
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTranslateSQLBackslashAtEnd(t *testing.T) {
+	d := &BaseDialect{Placeholder: DollarPlaceholder, BackslashEscapes: true}
+	got := d.TranslateSQL(`SELECT ? WHERE x = 'abc\`)
+	want := `SELECT $1 WHERE x = 'abc\`
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTranslateSQLEscapedQuoteInDouble(t *testing.T) {
+	d := &BaseDialect{Placeholder: DollarPlaceholder}
+	got := d.TranslateSQL(`SELECT ? WHERE x = "a""b" AND y = ?`)
+	want := `SELECT $1 WHERE x = "a""b" AND y = $2`
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTranslateSQLQuestionMarkOnlyInSingleQuote(t *testing.T) {
+	d := &BaseDialect{Placeholder: DollarPlaceholder}
+	got := d.TranslateSQL(`SELECT '?'`)
+	want := `SELECT '?'`
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTranslateSQLQuestionMarkOnlyInDoubleQuote(t *testing.T) {
+	d := &BaseDialect{Placeholder: DollarPlaceholder}
+	got := d.TranslateSQL(`SELECT "?"`)
+	want := `SELECT "?"`
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestCountUnquotedBackslashEscape(t *testing.T) {
+	d := &BaseDialect{Placeholder: QuestionMarkPlaceholder, BackslashEscapes: true}
+	got := d.TranslateSQL(`SELECT ? WHERE x = 'it\'s ?' AND y = ?`)
+	want := `SELECT ? WHERE x = 'it\'s ?' AND y = ?`
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestCountUnquotedDoubleQuoteBackslash(t *testing.T) {
+	d := &BaseDialect{Placeholder: QuestionMarkPlaceholder, BackslashEscapes: true}
+	got := d.TranslateSQL(`SELECT ? WHERE x = "test\"?" AND y = ?`)
+	want := `SELECT ? WHERE x = "test\"?" AND y = ?`
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}

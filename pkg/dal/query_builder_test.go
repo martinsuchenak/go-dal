@@ -1362,6 +1362,200 @@ func TestExecWithoutDBReturnsError(t *testing.T) {
 	}
 }
 
+func TestInsertQueryRowWithoutDB(t *testing.T) {
+	qb := NewQueryBuilder(&BaseDialect{Placeholder: QuestionMarkPlaceholder})
+	q := qb.Insert("test").Set("id", 1)
+	row := q.QueryRow(context.Background())
+	if row == nil {
+		t.Error("expected non-nil *sql.Row")
+	}
+}
+
+func TestUpdateQueryRowWithoutDB(t *testing.T) {
+	qb := NewQueryBuilder(&BaseDialect{Placeholder: QuestionMarkPlaceholder})
+	q := qb.Update("test").Set("name", "x").Where("id = ?", 1)
+	row := q.QueryRow(context.Background())
+	if row == nil {
+		t.Error("expected non-nil *sql.Row")
+	}
+}
+
+func TestDeleteQueryRowWithoutDB(t *testing.T) {
+	qb := NewQueryBuilder(&BaseDialect{Placeholder: QuestionMarkPlaceholder})
+	q := qb.Delete("test").Where("id = ?", 1)
+	row := q.QueryRow(context.Background())
+	if row == nil {
+		t.Error("expected non-nil *sql.Row")
+	}
+}
+
+func TestUpdateExecWithoutDBReturnsError(t *testing.T) {
+	qb := NewQueryBuilder(&BaseDialect{Placeholder: QuestionMarkPlaceholder})
+	q := qb.Update("test").Set("name", "x").Where("id = ?", 1)
+	result, err := q.Exec(context.Background())
+	if err == nil {
+		t.Fatal("expected error when db is nil")
+	}
+	if result != nil {
+		t.Error("expected nil result when db is nil")
+	}
+}
+
+func TestDeleteExecWithoutDBReturnsError(t *testing.T) {
+	qb := NewQueryBuilder(&BaseDialect{Placeholder: QuestionMarkPlaceholder})
+	q := qb.Delete("test").Where("id = ?", 1)
+	result, err := q.Exec(context.Background())
+	if err == nil {
+		t.Fatal("expected error when db is nil")
+	}
+	if result != nil {
+		t.Error("expected nil result when db is nil")
+	}
+}
+
+func TestSelectQueryWithoutDBReturnsError(t *testing.T) {
+	qb := NewQueryBuilder(&BaseDialect{Placeholder: QuestionMarkPlaceholder})
+	q := qb.Select("id").From("test").Where("id = ?", 1)
+	rows, err := q.Query(context.Background())
+	if err == nil {
+		t.Fatal("expected error when db is nil")
+	}
+	if rows != nil {
+		_ = rows.Close()
+		t.Error("expected nil rows when db is nil")
+	}
+}
+
+func TestSelectQueryRowWithoutDB(t *testing.T) {
+	qb := NewQueryBuilder(&BaseDialect{Placeholder: QuestionMarkPlaceholder})
+	q := qb.Select("id").From("test").Where("id = ?", 1)
+	row := q.QueryRow(context.Background())
+	if row == nil {
+		t.Error("expected non-nil *sql.Row")
+	}
+}
+
+func TestDBFactoryInsertQueryRow(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	d := &BaseDialect{Placeholder: QuestionMarkPlaceholder}
+	d.AppendReturning = d.WriteReturning
+	bdb := NewBaseDB(db, d, nil)
+
+	_, _ = bdb.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 1, "original")
+
+	row := bdb.Update("test").Set("name", "updated").Where("id = ?", 1).Returning("name").QueryRow(context.Background())
+	var name string
+	if err := row.Scan(&name); err != nil {
+		t.Skipf("RETURNING not supported by SQLite: %v", err)
+	}
+	if name != "updated" {
+		t.Errorf("got %q, want 'updated'", name)
+	}
+}
+
+func TestDBFactoryDeleteQueryRow(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	d := &BaseDialect{Placeholder: QuestionMarkPlaceholder}
+	d.AppendReturning = d.WriteReturning
+	bdb := NewBaseDB(db, d, nil)
+
+	_, _ = bdb.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 1, "todelete")
+
+	row := bdb.Delete("test").Where("id = ?", 1).Returning("name").QueryRow(context.Background())
+	var name string
+	if err := row.Scan(&name); err != nil {
+		t.Skipf("RETURNING not supported by SQLite: %v", err)
+	}
+	if name != "todelete" {
+		t.Errorf("got %q, want 'todelete'", name)
+	}
+}
+
+func TestDBFactoryInsertQueryRowDirect(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, nil)
+	row := bdb.Insert("test").Set("id", 42).Set("name", "rowtest").QueryRow(context.Background())
+	if row == nil {
+		t.Error("expected non-nil *sql.Row")
+	}
+}
+
+func TestInClauseWithBackslashEscape(t *testing.T) {
+	d := &BaseDialect{Placeholder: QuestionMarkPlaceholder, BackslashEscapes: true}
+	qb := NewQueryBuilder(d)
+	inVals, err := In(1, 2)
+	assertNoError(t, err)
+	query, args, err := qb.Select("id").
+		From("users").
+		Where("name = 'test\\'s ?'").Where("id IN (?)", inVals).
+		Build()
+	assertNoError(t, err)
+	assertQuery(t, query, "SELECT id FROM users WHERE name = 'test\\'s ?' AND id IN (?, ?)")
+	assertArgs(t, args, 1, 2)
+}
+
+func TestInClauseWithDoubleQuotedPlaceholder(t *testing.T) {
+	d := &BaseDialect{Placeholder: QuestionMarkPlaceholder}
+	qb := NewQueryBuilder(d)
+	inVals, err := In(1, 2)
+	assertNoError(t, err)
+	query, args, err := qb.Select("id").
+		From("users").
+		Where(`label = "size?"`).Where("id IN (?)", inVals).
+		Build()
+	assertNoError(t, err)
+	assertQuery(t, query, `SELECT id FROM users WHERE label = "size?" AND id IN (?, ?)`)
+	assertArgs(t, args, 1, 2)
+}
+
+func TestInClauseWithBackslashDoubleQuote(t *testing.T) {
+	d := &BaseDialect{Placeholder: QuestionMarkPlaceholder, BackslashEscapes: true}
+	qb := NewQueryBuilder(d)
+	inVals, err := In(1)
+	assertNoError(t, err)
+	query, args, err := qb.Select("id").
+		From("users").
+		Where(`x = "a\"?"`).Where("id IN (?)", inVals).
+		Build()
+	assertNoError(t, err)
+	assertQuery(t, query, `SELECT id FROM users WHERE x = "a\"?" AND id IN (?)`)
+	assertArgs(t, args, 1)
+}
+
+func TestInClauseWithEscapedSingleQuote(t *testing.T) {
+	d := &BaseDialect{Placeholder: QuestionMarkPlaceholder}
+	qb := NewQueryBuilder(d)
+	inVals, err := In(1)
+	assertNoError(t, err)
+	query, args, err := qb.Select("id").
+		From("users").
+		Where("name = 'it''s ?'").Where("id IN (?)", inVals).
+		Build()
+	assertNoError(t, err)
+	assertQuery(t, query, "SELECT id FROM users WHERE name = 'it''s ?' AND id IN (?)")
+	assertArgs(t, args, 1)
+}
+
+func TestInClauseWithEscapedDoubleQuote(t *testing.T) {
+	d := &BaseDialect{Placeholder: QuestionMarkPlaceholder}
+	qb := NewQueryBuilder(d)
+	inVals, err := In(1)
+	assertNoError(t, err)
+	query, args, err := qb.Select("id").
+		From("users").
+		Where(`x = "a""b?"`).Where("id IN (?)", inVals).
+		Build()
+	assertNoError(t, err)
+	assertQuery(t, query, `SELECT id FROM users WHERE x = "a""b?" AND id IN (?)`)
+	assertArgs(t, args, 1)
+}
+
 func assertNoError(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {

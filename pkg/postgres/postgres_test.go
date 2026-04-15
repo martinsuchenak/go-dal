@@ -1,9 +1,12 @@
 package postgres
 
 import (
+	"database/sql"
 	"testing"
 
 	"github.com/martinsuchenak/go-dal/pkg/dal"
+
+	_ "modernc.org/sqlite"
 )
 
 func TestNewQueryBuilderUsesDollar(t *testing.T) {
@@ -85,5 +88,29 @@ func TestTranslateSQL(t *testing.T) {
 	want := "UPDATE users SET x = $1 WHERE id = $2 AND name = $3"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestNewPostgresDB(t *testing.T) {
+	sqlDB, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = sqlDB.Close() }()
+
+	pdb := NewPostgresDB(sqlDB, nil)
+	if pdb == nil {
+		t.Fatal("expected non-nil PostgresDB")
+	}
+	if pdb.DB() != sqlDB {
+		t.Error("DB() should return the underlying *sql.DB")
+	}
+	if pdb.Dialect() == nil {
+		t.Error("Dialect() should return non-nil")
+	}
+
+	qb := pdb.NewQueryBuilder()
+	if qb == nil {
+		t.Fatal("expected non-nil QueryBuilder")
 	}
 }

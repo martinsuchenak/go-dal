@@ -600,6 +600,9 @@ func (d *BaseDialect) BuildInsert(q *InsertQuery) (string, []interface{}, error)
 }
 
 func (d *BaseDialect) BuildUpdate(q *UpdateQuery) (string, []interface{}, error) {
+	if q.table == "" {
+		return "", nil, ErrEmptyTable
+	}
 	if len(q.keys) == 0 {
 		return "", nil, ErrEmptyColumns
 	}

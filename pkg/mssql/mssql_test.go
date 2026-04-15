@@ -1,9 +1,12 @@
 package mssql
 
 import (
+	"database/sql"
 	"testing"
 
 	"github.com/martinsuchenak/go-dal/pkg/dal"
+
+	_ "modernc.org/sqlite"
 )
 
 func TestNewQueryBuilderUsesAtP(t *testing.T) {
@@ -97,5 +100,29 @@ func TestTranslateSQL(t *testing.T) {
 	want := "UPDATE users SET x = @p1 WHERE id = @p2"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestNewMSSQLDB(t *testing.T) {
+	sqlDB, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = sqlDB.Close() }()
+
+	mdb := NewMSSQLDB(sqlDB, nil)
+	if mdb == nil {
+		t.Fatal("expected non-nil MSSQLDB")
+	}
+	if mdb.DB() != sqlDB {
+		t.Error("DB() should return the underlying *sql.DB")
+	}
+	if mdb.Dialect() == nil {
+		t.Error("Dialect() should return non-nil")
+	}
+
+	qb := mdb.NewQueryBuilder()
+	if qb == nil {
+		t.Fatal("expected non-nil QueryBuilder")
 	}
 }

@@ -6,3 +6,4 @@ bin/
 .vscode/
 .local/
 tmp/
+coverage*.out

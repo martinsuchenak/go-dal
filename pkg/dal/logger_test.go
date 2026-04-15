@@ -324,3 +324,143 @@ func TestDBExecutorInterface(t *testing.T) {
 
 	var _ DBExecutor = tx
 }
+
+func TestNoopLoggerMethods(t *testing.T) {
+	log := NoopLogger{}
+	log.Trace("msg", "key", "val")
+	log.Debug("msg", "key", "val")
+	log.Info("msg", "key", "val")
+	log.Warn("msg", "key", "val")
+	log.Error("msg", "key", "val")
+	log.Fatal("msg", "key", "val")
+}
+
+func TestNoopLoggerInstance(t *testing.T) {
+	l := NoopLoggerInstance()
+	if l == nil {
+		t.Error("expected non-nil logger")
+	}
+	l.Debug("no-op call should not panic")
+}
+
+func TestSetLogger(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	log1 := &mockLogger{}
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, log1)
+
+	log2 := &mockLogger{}
+	bdb.SetLogger(log2)
+
+	_, _ = bdb.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 99, "test")
+
+	if e := log1.find("debug", "query exec"); e != nil {
+		t.Error("old logger should not receive entries after SetLogger")
+	}
+	if e := log2.find("debug", "query exec"); e == nil {
+		t.Error("new logger should receive entries after SetLogger")
+	}
+}
+
+func TestSetLoggerNil(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	log := &mockLogger{}
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, log)
+	bdb.SetLogger(nil)
+
+	_, _ = bdb.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 100, "noop")
+	if len(log.entries) > 0 {
+		t.Error("expected no log entries after SetLogger(nil)")
+	}
+}
+
+func TestClose(t *testing.T) {
+	db, _ := setupTestDB(t)
+	log := &mockLogger{}
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, log)
+
+	err := bdb.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e := log.find("debug", "close"); e == nil {
+		t.Error("expected 'close' log entry")
+	}
+}
+
+func TestPing(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	log := &mockLogger{}
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, log)
+
+	err := bdb.Ping(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e := log.find("debug", "ping"); e == nil {
+		t.Error("expected 'ping' log entry")
+	}
+}
+
+func TestDBMethod(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, nil)
+	if bdb.DB() != db {
+		t.Error("DB() should return the underlying *sql.DB")
+	}
+}
+
+func TestDialectMethod(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	d := &BaseDialect{Placeholder: QuestionMarkPlaceholder}
+	bdb := NewBaseDB(db, d, nil)
+	if bdb.Dialect() != d {
+		t.Error("Dialect() should return the configured dialect")
+	}
+}
+
+func TestTxQuery(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	_, _ = db.Exec("INSERT INTO test (id, name) VALUES (?, ?)", 1, "foo")
+
+	log := &mockLogger{}
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, log)
+
+	tx, err := bdb.BeginTx(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.Query(context.Background(), "SELECT name FROM test WHERE id = ?", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = rows.Close()
+
+	if e := log.find("debug", "tx query"); e == nil {
+		t.Error("expected 'tx query' log entry")
+	}
+	if e := log.find("debug", "tx query done"); e == nil {
+		t.Error("expected 'tx query done' log entry")
+	}
+}
+
+func TestQueryBuilderDialect(t *testing.T) {
+	d := &BaseDialect{Placeholder: QuestionMarkPlaceholder}
+	qb := NewQueryBuilder(d)
+	if qb.Dialect() != d {
+		t.Error("Dialect() should return the configured dialect")
+	}
+}

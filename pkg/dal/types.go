@@ -34,6 +34,9 @@ type DBInterface interface {
 	NewQueryBuilder() *QueryBuilder
 	// Dialect returns the dialect used by this connection.
 	Dialect() Dialect
+	// WithTx executes fn within a transaction, auto-committing on success and
+	// auto-rolling back on error or panic.
+	WithTx(ctx context.Context, opts *sql.TxOptions, fn func(*Tx) error) error
 }
 
 var (
