@@ -25,7 +25,7 @@ tests/integration/ Integration tests using Docker containers
 
 | Type | File | Purpose |
 |------|------|---------|
-| `DBInterface` | `pkg/dal/types.go` | Interface for all drivers (Exec, Query, QueryRow, BeginTx, Ping, Close) |
+| `DBInterface` | `pkg/dal/types.go` | Interface for all drivers (Exec, Query, QueryRow, BeginTx, Ping, Close + Select/Insert/Update/Delete factory methods) |
 | `DBExecutor` | `pkg/dal/logger.go` | Common interface for Exec/Query/QueryRow (satisfied by BaseDB and Tx) |
 | `BaseDB` | `pkg/dal/logger.go` | Shared implementation with structured logging; drivers embed this |
 | `Tx` | `pkg/dal/logger.go` | Transaction wrapper with logging |

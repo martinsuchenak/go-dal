@@ -18,7 +18,7 @@ type MSSQLDB struct {
 
 // NewMSSQLDB creates a new MSSQLDB. Pass nil for log to disable logging.
 func NewMSSQLDB(db *sql.DB, log dal.Logger) *MSSQLDB {
-	return &MSSQLDB{BaseDB: dal.NewBaseDB(db, log)}
+	return &MSSQLDB{BaseDB: dal.NewBaseDB(db, NewDialect(), log)}
 }
 
 // NewQueryBuilder returns a QueryBuilder configured for SQL Server ("@p1, @p2, ..." placeholders).

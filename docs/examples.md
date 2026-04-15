@@ -1,27 +1,56 @@
 # Examples
 
-All examples use MySQL. The same code works with PostgreSQL, SQLite, or SQL Server — just swap the import and constructor:
+## Two Styles
+
+**Direct execution** (recommended) — use `db.Select()`, `db.Insert()`, etc.:
+
+```go
+db := mysql.NewMySQLDB(sqlDB, nil)
+
+result, err := db.Insert("users").
+    Set("name", "Alice").
+    Set("email", "alice@example.com").
+    Exec(ctx)
+```
+
+**Build then execute** — use `NewQueryBuilder()` when you need to inspect SQL before running:
+
+```go
+db := mysql.NewMySQLDB(sqlDB, nil)
+qb := mysql.NewQueryBuilder()
+
+query, args, err := qb.Insert("users").
+    Set("name", "Alice").
+    Set("email", "alice@example.com").
+    Build()
+if err != nil {
+    log.Fatal(err)
+}
+result, err := db.Exec(ctx, query, args...)
+```
+
+---
+
+## Setup
+
+All examples below use the direct execution style with MySQL. Swap the import and constructor for other databases:
 
 ```go
 // MySQL
 import "github.com/martinsuchenak/go-dal/pkg/mysql"
 db := mysql.NewMySQLDB(sqlDB, nil)
-qb := mysql.NewQueryBuilder()
 
 // PostgreSQL
 import "github.com/martinsuchenak/go-dal/pkg/postgres"
 db := postgres.NewPostgresDB(sqlDB, nil)
-qb := postgres.NewQueryBuilder()
 
 // SQLite
 import "github.com/martinsuchenak/go-dal/pkg/sqlite"
 db := sqlite.NewSQLiteDB(sqlDB, nil)
-qb := sqlite.NewQueryBuilder()
 
 // SQL Server
 import "github.com/martinsuchenak/go-dal/pkg/mssql"
 db := mssql.NewMSSQLDB(sqlDB, nil)
-qb := mssql.NewQueryBuilder()
 ```
 
 ---
@@ -62,16 +91,10 @@ func main() {
 ### Basic select with WHERE
 
 ```go
-qb := mysql.NewQueryBuilder()
-query, args, err := qb.Select("id", "name", "email").
+rows, err := db.Select("id", "name", "email").
     From("users").
     Where("active = ?", true).
-    Build()
-if err != nil {
-    log.Fatal(err)
-}
-
-rows, err := db.Query(ctx, query, args...)
+    Query(ctx)
 if err != nil {
     log.Fatal(err)
 }
@@ -88,7 +111,7 @@ for rows.Next() {
 ### Select all columns
 
 ```go
-query, args, err := qb.SelectAll().From("users").Build()
+query, args, err := db.NewQueryBuilder().SelectAll().From("users").Build()
 if err != nil {
     log.Fatal(err)
 }
@@ -97,29 +120,23 @@ if err != nil {
 ### Select with multiple WHERE conditions
 
 ```go
-query, args, err := qb.Select("name").
+rows, err := db.Select("name").
     From("users").
     Where("active = ?", true).
     Where("age > ?", 18).
     Where("country = ?", "US").
-    Build()
-if err != nil {
-    log.Fatal(err)
-}
+    Query(ctx)
 // WHERE active = ? AND age > ? AND country = ?
 ```
 
 ### Select with OR
 
 ```go
-query, args, err := qb.Select("name").
+rows, err := db.Select("name").
     From("users").
     Where("role = ?", "admin").
     OrWhere("role = ?", "moderator").
-    Build()
-if err != nil {
-    log.Fatal(err)
-}
+    Query(ctx)
 // WHERE role = ? OR role = ?
 ```
 
@@ -231,17 +248,11 @@ if err == sql.ErrNoRows {
 ### Single-row insert
 
 ```go
-qb := mysql.NewQueryBuilder()
-query, args, err := qb.Insert("users").
+result, err := db.Insert("users").
     Set("name", "Alice").
     Set("email", "alice@example.com").
     Set("active", true).
-    Build()
-if err != nil {
-    log.Fatal(err)
-}
-
-result, err := db.Exec(ctx, query, args...)
+    Exec(ctx)
 if err != nil {
     log.Fatal(err)
 }
@@ -252,19 +263,16 @@ fmt.Println("inserted id:", id)
 ### Insert with SetMap
 
 ```go
-query, args, err := qb.Insert("users").
+result, err := db.Insert("users").
     SetMap(map[string]interface{}{
         "name":  "Alice",
         "email": "alice@example.com",
         "active": true,
     }).
-    Build()
+    Exec(ctx)
 if err != nil {
     log.Fatal(err)
 }
-// Keys are sorted: INSERT INTO `users` (`active`, `email`, `name`) VALUES (?, ?, ?)
-
-result, err := db.Exec(ctx, query, args...)
 ```
 
 ### Insert with SetStruct
@@ -276,7 +284,12 @@ type User struct {
     Active bool   `db:"active"`
 }
 
-query, args, err := qb.Insert("users").
+result, err := db.Insert("users").
+    SetStruct(User{Name: "Alice", Email: "alice@example.com", Active: true}).
+    Exec(ctx)
+if err != nil {
+    log.Fatal(err)
+}
     SetStruct(User{Name: "Alice", Email: "alice@example.com", Active: true}).
     Build()
 if err != nil {

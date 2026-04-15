@@ -43,6 +43,54 @@ if err := db.Ping(ctx); err != nil {
 sqlDB := db.DB()
 ```
 
+### Direct Execution
+
+The `db` instance provides factory methods (`Select`, `Insert`, `Update`, `Delete`) that return query objects pre-wired for direct execution. No separate `QueryBuilder` needed:
+
+```go
+// INSERT — build + execute in one chain
+result, err := db.Insert("users").
+    Set("name", "Alice").
+    Set("email", "alice@example.com").
+    Exec(ctx)
+
+// SELECT — build + query in one chain
+rows, err := db.Select("id", "name").
+    From("users").
+    Where("active = ?", true).
+    Query(ctx)
+
+// SELECT single row
+var name string
+err := db.Select("name").
+    From("users").
+    Where("id = ?", 42).
+    QueryRow(ctx).Scan(&name)
+
+// UPDATE
+result, err := db.Update("users").
+    Set("email", "new@example.com").
+    Where("id = ?", 42).
+    Exec(ctx)
+
+// DELETE
+result, err := db.Delete("users").Where("id = ?", 42).Exec(ctx)
+
+// INSERT with RETURNING (PostgreSQL)
+var id int
+err := db.Insert("users").
+    Set("name", "Alice").
+    Returning("id").
+    QueryRow(ctx).Scan(&id)
+```
+
+You can still call `Build()` on any query for inspection, logging, or deferred execution:
+
+```go
+q := db.Select("name").From("users").Where("id = ?", 42)
+query, args, err := q.Build()  // just build, don't execute
+```
+
 ---
 
 ## Query Builder

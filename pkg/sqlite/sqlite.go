@@ -18,7 +18,7 @@ type SQLiteDB struct {
 
 // NewSQLiteDB creates a new SQLiteDB. Pass nil for log to disable logging.
 func NewSQLiteDB(db *sql.DB, log dal.Logger) *SQLiteDB {
-	return &SQLiteDB{BaseDB: dal.NewBaseDB(db, log)}
+	return &SQLiteDB{BaseDB: dal.NewBaseDB(db, NewDialect(), log)}
 }
 
 // NewQueryBuilder returns a QueryBuilder configured for SQLite ("?" placeholders).

@@ -22,6 +22,18 @@ type DBInterface interface {
 	Ping(ctx context.Context) error
 	// Close closes the underlying database connection.
 	Close() error
+	// Select starts a SELECT query pre-wired to this connection.
+	Select(columns ...string) *SelectQuery
+	// Insert starts an INSERT query pre-wired to this connection.
+	Insert(table string) *InsertQuery
+	// Update starts an UPDATE query pre-wired to this connection.
+	Update(table string) *UpdateQuery
+	// Delete starts a DELETE query pre-wired to this connection.
+	Delete(table string) *DeleteQuery
+	// NewQueryBuilder returns a standalone QueryBuilder using this connection's dialect.
+	NewQueryBuilder() *QueryBuilder
+	// Dialect returns the dialect used by this connection.
+	Dialect() Dialect
 }
 
 var (
@@ -77,6 +89,7 @@ type SelectQuery struct {
 	limit    *int64
 	offset   *int64
 	dialect  Dialect
+	db       DBInterface
 }
 
 // InsertQuery builds an INSERT statement using a fluent API.
@@ -88,6 +101,7 @@ type InsertQuery struct {
 	rows      [][]interface{}
 	returning []string
 	dialect   Dialect
+	db        DBInterface
 }
 
 // UpdateQuery builds an UPDATE statement using a fluent API.
@@ -98,6 +112,7 @@ type UpdateQuery struct {
 	wheres    []whereClause
 	returning []string
 	dialect   Dialect
+	db        DBInterface
 }
 
 // DeleteQuery builds a DELETE statement using a fluent API.
@@ -106,4 +121,5 @@ type DeleteQuery struct {
 	wheres    []whereClause
 	returning []string
 	dialect   Dialect
+	db        DBInterface
 }

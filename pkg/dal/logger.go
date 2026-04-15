@@ -48,17 +48,18 @@ type DBExecutor interface {
 // and duration. Errors are logged at Error level.
 type BaseDB struct {
 	db      *sql.DB
+	dialect Dialect
 	mu      sync.RWMutex
 	log     Logger
 	logArgs bool
 }
 
 // NewBaseDB creates a BaseDB wrapping the given *sql.DB. If log is nil, logging is disabled.
-func NewBaseDB(db *sql.DB, log Logger) *BaseDB {
+func NewBaseDB(db *sql.DB, dialect Dialect, log Logger) *BaseDB {
 	if log == nil {
 		log = noopLogger
 	}
-	return &BaseDB{db: db, log: log}
+	return &BaseDB{db: db, dialect: dialect, log: log}
 }
 
 func (b *BaseDB) SetLogger(log Logger) {
@@ -140,6 +141,41 @@ func (b *BaseDB) Ping(ctx context.Context) error {
 // (connection pool configuration, raw queries, etc.).
 func (b *BaseDB) DB() *sql.DB {
 	return b.db
+}
+
+// Dialect returns the dialect used by this database connection.
+func (b *BaseDB) Dialect() Dialect {
+	return b.dialect
+}
+
+// Select starts a SELECT query pre-wired to this database connection.
+// Call Query(ctx) or QueryRow(ctx) to execute directly, or Build() for the raw SQL.
+func (b *BaseDB) Select(columns ...string) *SelectQuery {
+	return &SelectQuery{columns: columns, dialect: b.dialect, db: b}
+}
+
+// Insert starts an INSERT query pre-wired to this database connection.
+// Call Exec(ctx) to execute directly, or Build() for the raw SQL.
+func (b *BaseDB) Insert(table string) *InsertQuery {
+	return &InsertQuery{table: table, dialect: b.dialect, db: b}
+}
+
+// Update starts an UPDATE query pre-wired to this database connection.
+// Call Exec(ctx) to execute directly, or Build() for the raw SQL.
+func (b *BaseDB) Update(table string) *UpdateQuery {
+	return &UpdateQuery{table: table, dialect: b.dialect, db: b}
+}
+
+// Delete starts a DELETE query pre-wired to this database connection.
+// Call Exec(ctx) to execute directly, or Build() for the raw SQL.
+func (b *BaseDB) Delete(table string) *DeleteQuery {
+	return &DeleteQuery{table: table, dialect: b.dialect, db: b}
+}
+
+// NewQueryBuilder returns a standalone QueryBuilder using this connection's dialect.
+// For direct execution, prefer the Select/Insert/Update/Delete factory methods instead.
+func (b *BaseDB) NewQueryBuilder() *QueryBuilder {
+	return NewQueryBuilder(b.dialect)
 }
 
 // WithTx executes fn within a transaction. If fn returns an error, the transaction

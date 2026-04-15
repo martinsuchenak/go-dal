@@ -18,7 +18,7 @@ type PostgresDB struct {
 
 // NewPostgresDB creates a new PostgresDB. Pass nil for log to disable logging.
 func NewPostgresDB(db *sql.DB, log dal.Logger) *PostgresDB {
-	return &PostgresDB{BaseDB: dal.NewBaseDB(db, log)}
+	return &PostgresDB{BaseDB: dal.NewBaseDB(db, NewDialect(), log)}
 }
 
 // NewQueryBuilder returns a QueryBuilder configured for PostgreSQL ("$1, $2, ..." placeholders).

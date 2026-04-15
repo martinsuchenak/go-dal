@@ -1,6 +1,7 @@
 package dal
 
 import (
+	"context"
 	"testing"
 )
 
@@ -1207,6 +1208,158 @@ func TestSetStructDollarPlaceholders(t *testing.T) {
 	assertNoError(t, err)
 	assertQuery(t, query, `INSERT INTO users (name, email) VALUES ($1, $2)`)
 	assertArgs(t, args, "Alice", "alice@example.com")
+}
+
+func TestDBFactorySelectQuery(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, nil)
+	_, _ = bdb.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 1, "foo")
+
+	rows, err := bdb.Select("name").From("test").Where("id = ?", 1).Query(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rows.Close() }()
+	if !rows.Next() {
+		t.Fatal("expected a row")
+	}
+	var name string
+	if err := rows.Scan(&name); err != nil {
+		t.Fatal(err)
+	}
+	if name != "foo" {
+		t.Errorf("got %q, want 'foo'", name)
+	}
+}
+
+func TestDBFactorySelectQueryRow(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, nil)
+	_, _ = bdb.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 1, "bar")
+
+	var name string
+	err := bdb.Select("name").From("test").Where("id = ?", 1).QueryRow(context.Background()).Scan(&name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if name != "bar" {
+		t.Errorf("got %q, want 'bar'", name)
+	}
+}
+
+func TestDBFactoryInsertExec(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, nil)
+	result, err := bdb.Insert("test").Set("id", 1).Set("name", "alice").Exec(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, _ := result.RowsAffected()
+	if n != 1 {
+		t.Errorf("got %d rows, want 1", n)
+	}
+
+	var name string
+	if err := bdb.QueryRow(context.Background(), "SELECT name FROM test WHERE id = ?", 1).Scan(&name); err != nil {
+		t.Fatal(err)
+	}
+	if name != "alice" {
+		t.Errorf("got %q, want 'alice'", name)
+	}
+}
+
+func TestDBFactoryUpdateExec(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, nil)
+	_, _ = bdb.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 1, "old")
+
+	result, err := bdb.Update("test").Set("name", "new").Where("id = ?", 1).Exec(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, _ := result.RowsAffected()
+	if n != 1 {
+		t.Errorf("got %d rows, want 1", n)
+	}
+
+	var name string
+	if err := bdb.QueryRow(context.Background(), "SELECT name FROM test WHERE id = ?", 1).Scan(&name); err != nil {
+		t.Fatal(err)
+	}
+	if name != "new" {
+		t.Errorf("got %q, want 'new'", name)
+	}
+}
+
+func TestDBFactoryDeleteExec(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, nil)
+	_, _ = bdb.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 1, "gone")
+
+	result, err := bdb.Delete("test").Where("id = ?", 1).Exec(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, _ := result.RowsAffected()
+	if n != 1 {
+		t.Errorf("got %d rows, want 1", n)
+	}
+
+	var count int
+	if err := bdb.QueryRow(context.Background(), "SELECT COUNT(*) FROM test").Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Errorf("got %d rows, want 0", count)
+	}
+}
+
+func TestDBFactoryNewQueryBuilder(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, nil)
+	qb := bdb.NewQueryBuilder()
+	if qb == nil {
+		t.Fatal("expected non-nil QueryBuilder")
+	}
+	query, _, err := qb.Select("id").From("test").Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if query != "SELECT id FROM test" {
+		t.Errorf("got %q", query)
+	}
+}
+
+func TestBuildWithoutDB(t *testing.T) {
+	qb := NewQueryBuilder(&BaseDialect{Placeholder: QuestionMarkPlaceholder})
+	query, args, err := qb.Insert("test").Set("id", 1).Build()
+	assertNoError(t, err)
+	assertQuery(t, query, "INSERT INTO test (id) VALUES (?)")
+	assertArgs(t, args, 1)
+}
+
+func TestExecWithoutDBReturnsError(t *testing.T) {
+	qb := NewQueryBuilder(&BaseDialect{Placeholder: QuestionMarkPlaceholder})
+	q := qb.Insert("test").Set("id", 1)
+	result, err := q.Exec(context.Background())
+	if err == nil {
+		t.Fatal("expected error when db is nil")
+	}
+	if result != nil {
+		t.Error("expected nil result when db is nil")
+	}
 }
 
 func assertNoError(t *testing.T, err error) {

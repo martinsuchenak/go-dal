@@ -18,7 +18,7 @@ type MySQLDB struct {
 
 // NewMySQLDB creates a new MySQLDB. Pass nil for log to disable logging.
 func NewMySQLDB(db *sql.DB, log dal.Logger) *MySQLDB {
-	return &MySQLDB{BaseDB: dal.NewBaseDB(db, log)}
+	return &MySQLDB{BaseDB: dal.NewBaseDB(db, NewDialect(), log)}
 }
 
 // NewQueryBuilder returns a QueryBuilder configured for MySQL ("?" placeholders).

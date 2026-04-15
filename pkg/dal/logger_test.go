@@ -78,7 +78,7 @@ func TestBaseDBExecLogs(t *testing.T) {
 	defer cleanup()
 
 	log := &mockLogger{}
-	bdb := NewBaseDB(db, log)
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, log)
 
 	_, err := bdb.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 1, "foo")
 	if err != nil {
@@ -103,7 +103,7 @@ func TestBaseDBQueryLogs(t *testing.T) {
 	_, _ = db.Exec("INSERT INTO test (id, name) VALUES (?, ?)", 1, "foo")
 
 	log := &mockLogger{}
-	bdb := NewBaseDB(db, log)
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, log)
 
 	rows, err := bdb.Query(context.Background(), "SELECT id, name FROM test WHERE id = ?", 1)
 	if err != nil {
@@ -126,7 +126,7 @@ func TestBaseDBQueryRowLogs(t *testing.T) {
 	_, _ = db.Exec("INSERT INTO test (id, name) VALUES (?, ?)", 1, "foo")
 
 	log := &mockLogger{}
-	bdb := NewBaseDB(db, log)
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, log)
 
 	var name string
 	err := bdb.QueryRow(context.Background(), "SELECT name FROM test WHERE id = ?", 1).Scan(&name)
@@ -144,7 +144,7 @@ func TestBaseDBBeginTxLogs(t *testing.T) {
 	defer cleanup()
 
 	log := &mockLogger{}
-	bdb := NewBaseDB(db, log)
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, log)
 
 	tx, err := bdb.BeginTx(context.Background(), nil)
 	if err != nil {
@@ -162,7 +162,7 @@ func TestTxQueryRow(t *testing.T) {
 	_, _ = db.Exec("INSERT INTO test (id, name) VALUES (?, ?)", 1, "foo")
 
 	log := &mockLogger{}
-	bdb := NewBaseDB(db, log)
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, log)
 
 	tx, err := bdb.BeginTx(context.Background(), nil)
 	if err != nil {
@@ -186,7 +186,7 @@ func TestTxRollback(t *testing.T) {
 	defer cleanup()
 
 	log := &mockLogger{}
-	bdb := NewBaseDB(db, log)
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, log)
 
 	tx, err := bdb.BeginTx(context.Background(), nil)
 	if err != nil {
@@ -208,7 +208,7 @@ func TestWithTxCommit(t *testing.T) {
 	defer cleanup()
 
 	log := &mockLogger{}
-	bdb := NewBaseDB(db, log)
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, log)
 
 	err := bdb.WithTx(context.Background(), nil, func(tx *Tx) error {
 		_, err := tx.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 1, "withtx_test")
@@ -240,7 +240,7 @@ func TestWithTxRollbackOnError(t *testing.T) {
 	defer cleanup()
 
 	log := &mockLogger{}
-	bdb := NewBaseDB(db, log)
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, log)
 
 	err := bdb.WithTx(context.Background(), nil, func(tx *Tx) error {
 		return fmt.Errorf("intentional error")
@@ -259,7 +259,7 @@ func TestSetLogArgsEnabled(t *testing.T) {
 	defer cleanup()
 
 	log := &mockLogger{}
-	bdb := NewBaseDB(db, log)
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, log)
 	bdb.SetLogArgs(true)
 
 	_, _ = bdb.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 42, "hello")
@@ -288,7 +288,7 @@ func TestSetLogArgsRedacted(t *testing.T) {
 	defer cleanup()
 
 	log := &mockLogger{}
-	bdb := NewBaseDB(db, log)
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, log)
 	bdb.SetLogArgs(false)
 
 	_, _ = bdb.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 42, "hello")
@@ -312,7 +312,7 @@ func TestDBExecutorInterface(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	bdb := NewBaseDB(db, nil)
+	bdb := NewBaseDB(db, &BaseDialect{Placeholder: QuestionMarkPlaceholder}, nil)
 
 	var _ DBExecutor = bdb
 

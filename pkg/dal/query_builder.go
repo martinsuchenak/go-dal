@@ -1,6 +1,8 @@
 package dal
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"reflect"
 	"sort"
@@ -183,6 +185,32 @@ func (q *SelectQuery) Build() (string, []interface{}, error) {
 	return q.dialect.BuildSelect(q)
 }
 
+// Query builds the SELECT and executes it, returning rows.
+// Returns an error if the query was not created via a DB factory method.
+func (q *SelectQuery) Query(ctx context.Context) (*sql.Rows, error) {
+	if q.db == nil {
+		return nil, fmt.Errorf("dal: query not bound to a database, use db.Select() instead of qb.Select()")
+	}
+	query, args, err := q.Build()
+	if err != nil {
+		return nil, err
+	}
+	return q.db.Query(ctx, query, args...)
+}
+
+// QueryRow builds the SELECT and executes it, returning a single row.
+// Returns an empty *sql.Row if not bound to a database.
+func (q *SelectQuery) QueryRow(ctx context.Context) *sql.Row {
+	if q.db == nil {
+		return &sql.Row{}
+	}
+	query, args, err := q.Build()
+	if err != nil {
+		return &sql.Row{}
+	}
+	return q.db.QueryRow(ctx, query, args...)
+}
+
 // --- WhereGroup ---
 
 // WhereGroup collects conditions for a parenthesized group.
@@ -268,6 +296,31 @@ func (q *InsertQuery) Build() (string, []interface{}, error) {
 	return q.dialect.BuildInsert(q)
 }
 
+// Exec builds the INSERT and executes it.
+// Returns an error if the query was not created via a DB factory method.
+func (q *InsertQuery) Exec(ctx context.Context) (sql.Result, error) {
+	if q.db == nil {
+		return nil, fmt.Errorf("dal: query not bound to a database, use db.Insert() instead of qb.Insert()")
+	}
+	query, args, err := q.Build()
+	if err != nil {
+		return nil, err
+	}
+	return q.db.Exec(ctx, query, args...)
+}
+
+// QueryRow builds the INSERT and executes it, returning the row (for RETURNING clauses).
+func (q *InsertQuery) QueryRow(ctx context.Context) *sql.Row {
+	if q.db == nil {
+		return &sql.Row{}
+	}
+	query, args, err := q.Build()
+	if err != nil {
+		return &sql.Row{}
+	}
+	return q.db.QueryRow(ctx, query, args...)
+}
+
 // --- UpdateQuery ---
 
 // Set adds a column-value pair to the UPDATE statement.
@@ -325,6 +378,31 @@ func (q *UpdateQuery) Build() (string, []interface{}, error) {
 	return q.dialect.BuildUpdate(q)
 }
 
+// Exec builds the UPDATE and executes it.
+// Returns an error if the query was not created via a DB factory method.
+func (q *UpdateQuery) Exec(ctx context.Context) (sql.Result, error) {
+	if q.db == nil {
+		return nil, fmt.Errorf("dal: query not bound to a database, use db.Update() instead of qb.Update()")
+	}
+	query, args, err := q.Build()
+	if err != nil {
+		return nil, err
+	}
+	return q.db.Exec(ctx, query, args...)
+}
+
+// QueryRow builds the UPDATE and executes it, returning the row (for RETURNING clauses).
+func (q *UpdateQuery) QueryRow(ctx context.Context) *sql.Row {
+	if q.db == nil {
+		return &sql.Row{}
+	}
+	query, args, err := q.Build()
+	if err != nil {
+		return &sql.Row{}
+	}
+	return q.db.QueryRow(ctx, query, args...)
+}
+
 // --- DeleteQuery ---
 
 // Where adds a WHERE condition combined with AND.
@@ -348,6 +426,31 @@ func (q *DeleteQuery) Returning(columns ...string) *DeleteQuery {
 // Build constructs the DELETE SQL string and returns it along with the ordered argument slice.
 func (q *DeleteQuery) Build() (string, []interface{}, error) {
 	return q.dialect.BuildDelete(q)
+}
+
+// Exec builds the DELETE and executes it.
+// Returns an error if the query was not created via a DB factory method.
+func (q *DeleteQuery) Exec(ctx context.Context) (sql.Result, error) {
+	if q.db == nil {
+		return nil, fmt.Errorf("dal: query not bound to a database, use db.Delete() instead of qb.Delete()")
+	}
+	query, args, err := q.Build()
+	if err != nil {
+		return nil, err
+	}
+	return q.db.Exec(ctx, query, args...)
+}
+
+// QueryRow builds the DELETE and executes it, returning the row (for RETURNING clauses).
+func (q *DeleteQuery) QueryRow(ctx context.Context) *sql.Row {
+	if q.db == nil {
+		return &sql.Row{}
+	}
+	query, args, err := q.Build()
+	if err != nil {
+		return &sql.Row{}
+	}
+	return q.db.QueryRow(ctx, query, args...)
 }
 
 // --- Struct field reflection ---
