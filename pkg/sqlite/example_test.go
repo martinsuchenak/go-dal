@@ -18,7 +18,7 @@ func Example_sqliteCRUD() {
 	}
 	defer db.Close()
 
-	dal := sqlite.NewSQLiteDB(db)
+	dal := sqlite.NewSQLiteDB(db, nil)
 
 	ctx := context.Background()
 	dal.Exec(ctx, "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT)")
@@ -26,18 +26,24 @@ func Example_sqliteCRUD() {
 	qb := sqlite.NewQueryBuilder()
 
 	// Insert
-	insertQ, insertArgs := qb.Insert("users").
+	insertQ, insertArgs, err := qb.Insert("users").
 		Set("name", "Alice").
 		Set("email", "alice@example.com").
 		Build()
+	if err != nil {
+		log.Fatal(err)
+	}
 	dal.Exec(ctx, insertQ, insertArgs...)
 
 	// Select
 	qb = sqlite.NewQueryBuilder()
-	selQ, selArgs := qb.Select("name", "email").
+	selQ, selArgs, err := qb.Select("name", "email").
 		From("users").
 		Where("name = ?", "Alice").
 		Build()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	var name, email string
 	dal.QueryRow(ctx, selQ, selArgs...).Scan(&name, &email)
@@ -45,17 +51,23 @@ func Example_sqliteCRUD() {
 
 	// Update
 	qb = sqlite.NewQueryBuilder()
-	updQ, updArgs := qb.Update("users").
+	updQ, updArgs, err := qb.Update("users").
 		Set("email", "alice_new@example.com").
 		Where("name = ?", "Alice").
 		Build()
+	if err != nil {
+		log.Fatal(err)
+	}
 	dal.Exec(ctx, updQ, updArgs...)
 
 	// Delete
 	qb = sqlite.NewQueryBuilder()
-	delQ, delArgs := qb.Delete("users").
+	delQ, delArgs, err := qb.Delete("users").
 		Where("name = ?", "Alice").
 		Build()
+	if err != nil {
+		log.Fatal(err)
+	}
 	dal.Exec(ctx, delQ, delArgs...)
 
 	// Output: Alice alice@example.com

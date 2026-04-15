@@ -8,11 +8,14 @@ import (
 
 func TestNewQueryBuilderUsesDollar(t *testing.T) {
 	qb := NewQueryBuilder()
-	query, args := qb.Insert("users").
+	query, args, err := qb.Insert("users").
 		Set("name", "John").
 		Build()
 
-	expected := "INSERT INTO users (name) VALUES ($1)"
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := `INSERT INTO "users" ("name") VALUES ($1)`
 	if query != expected {
 		t.Errorf("got %q, want %q", query, expected)
 	}
@@ -23,12 +26,15 @@ func TestNewQueryBuilderUsesDollar(t *testing.T) {
 
 func TestNewQueryBuilderSelectWhere(t *testing.T) {
 	qb := NewQueryBuilder()
-	query, args := qb.Select("id").
+	query, args, err := qb.Select("id").
 		From("users").
 		Where("id = ?", 1).
 		Build()
 
-	expected := "SELECT id FROM users WHERE id = $1"
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := `SELECT "id" FROM "users" WHERE id = $1`
 	if query != expected {
 		t.Errorf("got %q, want %q", query, expected)
 	}
@@ -39,12 +45,15 @@ func TestNewQueryBuilderSelectWhere(t *testing.T) {
 
 func TestNewQueryBuilderUpdate(t *testing.T) {
 	qb := NewQueryBuilder()
-	query, args := qb.Update("users").
+	query, args, err := qb.Update("users").
 		Set("name", "Jane").
 		Where("id = ?", 1).
 		Build()
 
-	expected := "UPDATE users SET name = $1 WHERE id = $2"
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := `UPDATE "users" SET "name" = $1 WHERE id = $2`
 	if query != expected {
 		t.Errorf("got %q, want %q", query, expected)
 	}

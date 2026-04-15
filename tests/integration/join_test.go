@@ -11,12 +11,15 @@ func TestInnerJoin(t *testing.T) {
 		ctx := context.Background()
 		qb := td.builder()
 
-		query, args := qb.Select("u.name", "p.name", "o.quantity").
+		query, args, err := qb.Select("u.name", "p.name", "o.quantity").
 			From("users u").
 			Join("INNER JOIN orders o ON o.user_id = u.id").
 			Join("INNER JOIN products p ON p.id = o.product_id").
 			OrderBy("u.name", "p.name").
 			Build()
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		rows, err := td.dalDB.Query(ctx, query, args...)
 		if err != nil {
@@ -66,11 +69,14 @@ func TestLeftJoin(t *testing.T) {
 		qb := td.builder()
 
 		// Charlie has no orders -- LEFT JOIN should still return Charlie with NULLs
-		query, args := qb.Select("u.name", "o.total_price").
+		query, args, err := qb.Select("u.name", "o.total_price").
 			From("users u").
 			Join("LEFT JOIN orders o ON o.user_id = u.id").
 			OrderBy("u.name", "o.total_price").
 			Build()
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		rows, err := td.dalDB.Query(ctx, query, args...)
 		if err != nil {
@@ -112,12 +118,15 @@ func TestJoinWithWhere(t *testing.T) {
 		ctx := context.Background()
 		qb := td.builder()
 
-		query, args := qb.Select("u.name", "o.total_price").
+		query, args, err := qb.Select("u.name", "o.total_price").
 			From("users u").
 			Join("INNER JOIN orders o ON o.user_id = u.id").
 			Where("u.name = ?", "Bob").
 			OrderBy("o.total_price").
 			Build()
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		rows, err := td.dalDB.Query(ctx, query, args...)
 		if err != nil {

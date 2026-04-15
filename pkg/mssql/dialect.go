@@ -7,5 +7,6 @@ func NewDialect() dal.Dialect {
 	return &dal.BaseDialect{
 		PlaceholderStyle: dal.AtPNumber,
 		LimitStyle:       dal.FetchNextStyle,
+		QuoteStyle:       dal.BracketQuoting,
 	}
 }

@@ -324,3 +324,55 @@ func TestDBMethodReturnsUnderlyingDB(t *testing.T) {
 		t.Error("DB() should return the underlying *sql.DB")
 	}
 }
+
+func TestBaseDBPingLogs(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	log := &mockLogger{}
+	bdb := NewBaseDB(db, log)
+
+	err := bdb.Ping(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if e := log.find("debug", "ping"); e == nil {
+		t.Error("expected 'ping' log entry")
+	}
+}
+
+func TestBeginTxReturnsTxWrapper(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	log := &mockLogger{}
+	bdb := NewBaseDB(db, log)
+
+	tx, err := bdb.BeginTx(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if e := log.find("debug", "begin_tx"); e == nil {
+		t.Error("expected 'begin_tx' log entry")
+	}
+
+	_, err = tx.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 99, "tx_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if e := log.find("debug", "tx exec"); e == nil {
+		t.Error("expected 'tx exec' log entry")
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if e := log.find("debug", "tx commit"); e == nil {
+		t.Error("expected 'tx commit' log entry")
+	}
+}

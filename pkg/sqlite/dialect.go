@@ -7,5 +7,6 @@ func NewDialect() dal.Dialect {
 	return &dal.BaseDialect{
 		PlaceholderStyle: dal.QuestionMark,
 		LimitStyle:       dal.LimitOffsetStyle,
+		QuoteStyle:       dal.DoubleQuoteQuoting,
 	}
 }

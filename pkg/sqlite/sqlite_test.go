@@ -8,11 +8,14 @@ import (
 
 func TestNewQueryBuilderUsesQuestionMark(t *testing.T) {
 	qb := NewQueryBuilder()
-	query, args := qb.Insert("users").
+	query, args, err := qb.Insert("users").
 		Set("name", "John").
 		Build()
 
-	expected := "INSERT INTO users (name) VALUES (?)"
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := `INSERT INTO "users" ("name") VALUES (?)`
 	if query != expected {
 		t.Errorf("got %q, want %q", query, expected)
 	}
@@ -23,12 +26,15 @@ func TestNewQueryBuilderUsesQuestionMark(t *testing.T) {
 
 func TestNewQueryBuilderSelectWhere(t *testing.T) {
 	qb := NewQueryBuilder()
-	query, args := qb.Select("id").
+	query, args, err := qb.Select("id").
 		From("users").
 		Where("id = ?", 1).
 		Build()
 
-	expected := "SELECT id FROM users WHERE id = ?"
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := `SELECT "id" FROM "users" WHERE id = ?`
 	if query != expected {
 		t.Errorf("got %q, want %q", query, expected)
 	}

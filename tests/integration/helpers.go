@@ -23,7 +23,6 @@ type testDB struct {
 	name    string
 	db      *sql.DB
 	dalDB   dal.DBInterface
-	qb      *dal.QueryBuilder
 	builder func() *dal.QueryBuilder
 }
 
@@ -62,7 +61,7 @@ func setupAllDBs(t *testing.T) []*testDB {
 	if err != nil {
 		t.Fatalf("sqlite open: %v", err)
 	}
-	sqliteDalDB := sqlite.NewSQLiteDB(sqliteDB)
+	sqliteDalDB := sqlite.NewSQLiteDB(sqliteDB, nil)
 	dbs = append(dbs, &testDB{
 		name:  "sqlite",
 		db:    sqliteDB,
@@ -74,7 +73,7 @@ func setupAllDBs(t *testing.T) []*testDB {
 
 	// MySQL
 	mysqlDB := connectWithRetry(t, "mysql", "root:testpass@tcp(localhost:13306)/godal_test?parseTime=true", 10*time.Second)
-	mysqlDalDB := mysql.NewMySQLDB(mysqlDB)
+	mysqlDalDB := mysql.NewMySQLDB(mysqlDB, nil)
 	dbs = append(dbs, &testDB{
 		name:  "mysql",
 		db:    mysqlDB,
@@ -86,7 +85,7 @@ func setupAllDBs(t *testing.T) []*testDB {
 
 	// PostgreSQL
 	pgDB := connectWithRetry(t, "postgres", "postgres://godal:testpass@localhost:15432/godal_test?sslmode=disable", 10*time.Second)
-	pgDalDB := postgres.NewPostgresDB(pgDB)
+	pgDalDB := postgres.NewPostgresDB(pgDB, nil)
 	dbs = append(dbs, &testDB{
 		name:  "postgres",
 		db:    pgDB,
@@ -102,7 +101,7 @@ func setupAllDBs(t *testing.T) []*testDB {
 	mssqlMaster.Close()
 
 	mssqlDB := connectWithRetry(t, "sqlserver", "sqlserver://sa:TestPass123!@localhost:11433?database=godal_test&encrypt=disable", 10*time.Second)
-	mssqlDalDB := mssql.NewMSSQLDB(mssqlDB)
+	mssqlDalDB := mssql.NewMSSQLDB(mssqlDB, nil)
 	dbs = append(dbs, &testDB{
 		name:  "mssql",
 		db:    mssqlDB,

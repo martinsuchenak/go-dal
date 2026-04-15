@@ -1,5 +1,7 @@
 package dal
 
+import "fmt"
+
 // QueryBuilder creates SQL queries with the configured Dialect.
 type QueryBuilder struct {
 	dialect Dialect
@@ -10,9 +12,14 @@ func NewQueryBuilder(dialect Dialect) *QueryBuilder {
 	return &QueryBuilder{dialect: dialect}
 }
 
-// Select starts a SELECT query with the given columns. Use no columns for SELECT *.
+// Select starts a SELECT query with the given columns.
 func (qb *QueryBuilder) Select(columns ...string) *SelectQuery {
 	return &SelectQuery{columns: columns, dialect: qb.dialect}
+}
+
+// SelectAll starts a SELECT * query.
+func (qb *QueryBuilder) SelectAll() *SelectQuery {
+	return &SelectQuery{dialect: qb.dialect}
 }
 
 // Insert starts an INSERT query for the specified table.
@@ -30,22 +37,98 @@ func (qb *QueryBuilder) Delete(table string) *DeleteQuery {
 	return &DeleteQuery{table: table, dialect: qb.dialect}
 }
 
+// In marks values for IN-clause expansion. When passed to Where, a single "?"
+// is expanded to match the number of values:
+//
+//	qb.Where("id IN (?)", dal.In(1, 2, 3))
+//	// Generates: WHERE id IN (?, ?, ?) with args [1, 2, 3]
+//
+// Returns an error if no values are provided or if the count exceeds MaxInValues.
+func In(values ...interface{}) (InValues, error) {
+	if len(values) == 0 {
+		return nil, ErrEmptyInValues
+	}
+	if len(values) > MaxInValues {
+		return nil, ErrTooManyInValues
+	}
+	return InValues(values), nil
+}
+
+// --- SelectQuery ---
+
 // From sets the table to select from.
 func (q *SelectQuery) From(table string) *SelectQuery {
 	q.table = table
 	return q
 }
 
+// Distinct adds the DISTINCT keyword to the SELECT query.
+func (q *SelectQuery) Distinct() *SelectQuery {
+	q.distinct = true
+	return q
+}
+
 // Join adds a JOIN clause (e.g., "INNER JOIN orders ON users.id = orders.user_id").
+// The clause string is included verbatim in the generated SQL — only pass trusted,
+// hardcoded strings, never user input.
 func (q *SelectQuery) Join(clause string) *SelectQuery {
 	q.joins = append(q.joins, clause)
 	return q
 }
 
-// Where adds a WHERE condition. Use "?" as placeholder for parameterized values.
-// Multiple Where calls are combined with AND.
+// Where adds a WHERE condition combined with AND.
+// Use "?" as placeholder for parameterized values.
 func (q *SelectQuery) Where(condition string, args ...interface{}) *SelectQuery {
-	q.wheres = append(q.wheres, whereClause{condition: condition, args: args})
+	q.wheres = append(q.wheres, whereClause{condition: condition, args: args, connector: andConnector})
+	return q
+}
+
+// OrWhere adds a WHERE condition combined with OR.
+func (q *SelectQuery) OrWhere(condition string, args ...interface{}) *SelectQuery {
+	q.wheres = append(q.wheres, whereClause{condition: condition, args: args, connector: orConnector})
+	return q
+}
+
+// WhereGroup adds a parenthesized group of conditions combined with AND.
+// Use the callback to add conditions within the group:
+//
+//	qb.WhereGroup(func(g *WhereGroup) {
+//	    g.Where("a = ?", 1).OrWhere("b = ?", 2)
+//	})
+func (q *SelectQuery) WhereGroup(fn func(*WhereGroup)) *SelectQuery {
+	g := &WhereGroup{}
+	fn(g)
+	q.wheres = append(q.wheres, whereClause{connector: groupConnector, children: g.clauses})
+	return q
+}
+
+// OrWhereGroup adds a parenthesized group of conditions combined with OR.
+func (q *SelectQuery) OrWhereGroup(fn func(*WhereGroup)) *SelectQuery {
+	g := &WhereGroup{}
+	fn(g)
+	q.wheres = append(q.wheres, whereClause{connector: groupOrConnector, children: g.clauses})
+	return q
+}
+
+// WhereIsNull adds "column IS NULL" condition.
+func (q *SelectQuery) WhereIsNull(column string) *SelectQuery {
+	q.wheres = append(q.wheres, whereClause{condition: fmt.Sprintf("%s IS NULL", column), connector: andConnector})
+	return q
+}
+
+// WhereIsNotNull adds "column IS NOT NULL" condition.
+func (q *SelectQuery) WhereIsNotNull(column string) *SelectQuery {
+	q.wheres = append(q.wheres, whereClause{condition: fmt.Sprintf("%s IS NOT NULL", column), connector: andConnector})
+	return q
+}
+
+// WhereBetween adds "column BETWEEN low AND high" condition.
+func (q *SelectQuery) WhereBetween(column string, low, high interface{}) *SelectQuery {
+	q.wheres = append(q.wheres, whereClause{
+		condition: fmt.Sprintf("%s BETWEEN ? AND ?", column),
+		args:      []interface{}{low, high},
+		connector: andConnector,
+	})
 	return q
 }
 
@@ -56,13 +139,19 @@ func (q *SelectQuery) GroupBy(columns ...string) *SelectQuery {
 }
 
 // Having adds a HAVING condition. Use "?" as placeholder for parameterized values.
-// Multiple Having calls are combined with AND.
 func (q *SelectQuery) Having(condition string, args ...interface{}) *SelectQuery {
-	q.having = append(q.having, whereClause{condition: condition, args: args})
+	q.having = append(q.having, whereClause{condition: condition, args: args, connector: andConnector})
+	return q
+}
+
+// OrHaving adds a HAVING condition combined with OR.
+func (q *SelectQuery) OrHaving(condition string, args ...interface{}) *SelectQuery {
+	q.having = append(q.having, whereClause{condition: condition, args: args, connector: orConnector})
 	return q
 }
 
 // OrderBy adds an ORDER BY clause with the specified columns (e.g., "name ASC", "id DESC").
+// Only pass trusted, hardcoded strings — never user input.
 func (q *SelectQuery) OrderBy(columns ...string) *SelectQuery {
 	q.orderBy = append(q.orderBy, columns...)
 	return q
@@ -81,22 +170,64 @@ func (q *SelectQuery) Offset(offset int64) *SelectQuery {
 }
 
 // Build constructs the SELECT SQL string and returns it along with the ordered argument slice.
-func (q *SelectQuery) Build() (string, []interface{}) {
+func (q *SelectQuery) Build() (string, []interface{}, error) {
 	return q.dialect.BuildSelect(q)
 }
 
-// Set adds a column-value pair to the INSERT statement.
+// --- WhereGroup ---
+
+// WhereGroup collects conditions for a parenthesized group.
+type WhereGroup struct {
+	clauses []whereClause
+}
+
+// Where adds a condition combined with AND within the group.
+func (g *WhereGroup) Where(condition string, args ...interface{}) *WhereGroup {
+	g.clauses = append(g.clauses, whereClause{condition: condition, args: args, connector: andConnector})
+	return g
+}
+
+// OrWhere adds a condition combined with OR within the group.
+func (g *WhereGroup) OrWhere(condition string, args ...interface{}) *WhereGroup {
+	g.clauses = append(g.clauses, whereClause{condition: condition, args: args, connector: orConnector})
+	return g
+}
+
+// --- InsertQuery ---
+
+// Set adds a column-value pair for a single-row INSERT.
 func (q *InsertQuery) Set(key string, value interface{}) *InsertQuery {
 	q.keys = append(q.keys, key)
 	q.values = append(q.values, value)
 	return q
 }
 
+// Columns sets the column names for a multi-row INSERT.
+func (q *InsertQuery) Columns(columns ...string) *InsertQuery {
+	q.keys = columns
+	return q
+}
+
+// Values adds a row of values for a multi-row INSERT.
+func (q *InsertQuery) Values(values ...interface{}) *InsertQuery {
+	q.rows = append(q.rows, values)
+	return q
+}
+
+// Returning adds a RETURNING clause (PostgreSQL, SQLite) or OUTPUT clause (MSSQL).
+// Returns an error from Build() if the dialect does not support it.
+func (q *InsertQuery) Returning(columns ...string) *InsertQuery {
+	q.returning = columns
+	return q
+}
+
 // Build constructs the INSERT SQL string and returns it along with the ordered argument slice.
-// Returns an empty string if no columns have been set.
-func (q *InsertQuery) Build() (string, []interface{}) {
+// Returns an error if no columns have been set or if RETURNING is unsupported.
+func (q *InsertQuery) Build() (string, []interface{}, error) {
 	return q.dialect.BuildInsert(q)
 }
+
+// --- UpdateQuery ---
 
 // Set adds a column-value pair to the UPDATE statement.
 func (q *UpdateQuery) Set(key string, value interface{}) *UpdateQuery {
@@ -105,27 +236,51 @@ func (q *UpdateQuery) Set(key string, value interface{}) *UpdateQuery {
 	return q
 }
 
-// Where adds a WHERE condition. Use "?" as placeholder for parameterized values.
-// Multiple Where calls are combined with AND.
+// Where adds a WHERE condition combined with AND.
 func (q *UpdateQuery) Where(condition string, args ...interface{}) *UpdateQuery {
-	q.wheres = append(q.wheres, whereClause{condition: condition, args: args})
+	q.wheres = append(q.wheres, whereClause{condition: condition, args: args, connector: andConnector})
+	return q
+}
+
+// OrWhere adds a WHERE condition combined with OR.
+func (q *UpdateQuery) OrWhere(condition string, args ...interface{}) *UpdateQuery {
+	q.wheres = append(q.wheres, whereClause{condition: condition, args: args, connector: orConnector})
+	return q
+}
+
+// Returning adds a RETURNING clause (PostgreSQL) or OUTPUT clause (MSSQL).
+func (q *UpdateQuery) Returning(columns ...string) *UpdateQuery {
+	q.returning = columns
 	return q
 }
 
 // Build constructs the UPDATE SQL string and returns it along with the ordered argument slice.
-// Returns an empty string if no columns have been set.
-func (q *UpdateQuery) Build() (string, []interface{}) {
+// Returns an error if no columns have been set.
+func (q *UpdateQuery) Build() (string, []interface{}, error) {
 	return q.dialect.BuildUpdate(q)
 }
 
-// Where adds a WHERE condition. Use "?" as placeholder for parameterized values.
-// Multiple Where calls are combined with AND.
+// --- DeleteQuery ---
+
+// Where adds a WHERE condition combined with AND.
 func (q *DeleteQuery) Where(condition string, args ...interface{}) *DeleteQuery {
-	q.wheres = append(q.wheres, whereClause{condition: condition, args: args})
+	q.wheres = append(q.wheres, whereClause{condition: condition, args: args, connector: andConnector})
+	return q
+}
+
+// OrWhere adds a WHERE condition combined with OR.
+func (q *DeleteQuery) OrWhere(condition string, args ...interface{}) *DeleteQuery {
+	q.wheres = append(q.wheres, whereClause{condition: condition, args: args, connector: orConnector})
+	return q
+}
+
+// Returning adds a RETURNING clause (PostgreSQL) or OUTPUT clause (MSSQL).
+func (q *DeleteQuery) Returning(columns ...string) *DeleteQuery {
+	q.returning = columns
 	return q
 }
 
 // Build constructs the DELETE SQL string and returns it along with the ordered argument slice.
-func (q *DeleteQuery) Build() (string, []interface{}) {
+func (q *DeleteQuery) Build() (string, []interface{}, error) {
 	return q.dialect.BuildDelete(q)
 }

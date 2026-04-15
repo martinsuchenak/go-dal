@@ -10,13 +10,16 @@ func TestCountAggregate(t *testing.T) {
 		ctx := context.Background()
 		qb := td.builder()
 
-		query, args := qb.Select("COUNT(*)").
+		query, args, err := qb.Select("COUNT(*)").
 			From("users").
 			Where("active = ?", true).
 			Build()
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		var count int
-		err := td.dalDB.QueryRow(ctx, query, args...).Scan(&count)
+		err = td.dalDB.QueryRow(ctx, query, args...).Scan(&count)
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
@@ -33,21 +36,25 @@ func TestSumAggregate(t *testing.T) {
 
 		var query string
 		var args []interface{}
+		var err error
 		if td.name == "postgres" {
-			query, args = qb.Select("SUM(o.total_price)").
+			query, args, err = qb.Select("SUM(o.total_price)").
 				From("orders o").
 				Join("INNER JOIN users u ON u.id = o.user_id").
 				Where("u.name = ?", "Alice").
 				Build()
 		} else {
-			query, args = qb.Select("SUM(total_price)").
+			query, args, err = qb.Select("SUM(total_price)").
 				From("orders").
 				Where("user_id = (SELECT id FROM users WHERE name = ?)", "Alice").
 				Build()
 		}
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		var total *float64
-		err := td.dalDB.QueryRow(ctx, query, args...).Scan(&total)
+		err = td.dalDB.QueryRow(ctx, query, args...).Scan(&total)
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
@@ -66,12 +73,15 @@ func TestGroupBy(t *testing.T) {
 		ctx := context.Background()
 		qb := td.builder()
 
-		query, args := qb.Select("u.name", "COUNT(o.id) as order_count").
+		query, args, err := qb.Select("u.name", "COUNT(o.id) as order_count").
 			From("users u").
 			Join("LEFT JOIN orders o ON o.user_id = u.id").
 			GroupBy("u.name").
 			OrderBy("u.name").
 			Build()
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		rows, err := td.dalDB.Query(ctx, query, args...)
 		if err != nil {
@@ -113,13 +123,16 @@ func TestGroupByWithHaving(t *testing.T) {
 		ctx := context.Background()
 		qb := td.builder()
 
-		query, args := qb.Select("u.name", "SUM(o.total_price) as total_spent").
+		query, args, err := qb.Select("u.name", "SUM(o.total_price) as total_spent").
 			From("users u").
 			Join("INNER JOIN orders o ON o.user_id = u.id").
 			GroupBy("u.name").
 			Having("SUM(o.total_price) > ?", 50).
 			OrderBy("total_spent DESC").
 			Build()
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		rows, err := td.dalDB.Query(ctx, query, args...)
 		if err != nil {
@@ -196,13 +209,16 @@ func TestGroupByMultipleColumns(t *testing.T) {
 		ctx := context.Background()
 		qb := td.builder()
 
-		query, args := qb.Select("u.name", "p.name as product", "SUM(o.quantity) as total_qty").
+		query, args, err := qb.Select("u.name", "p.name as product", "SUM(o.quantity) as total_qty").
 			From("users u").
 			Join("INNER JOIN orders o ON o.user_id = u.id").
 			Join("INNER JOIN products p ON p.id = o.product_id").
 			GroupBy("u.name", "p.name").
 			OrderBy("u.name", "p.name").
 			Build()
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		rows, err := td.dalDB.Query(ctx, query, args...)
 		if err != nil {
