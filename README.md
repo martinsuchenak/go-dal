@@ -17,16 +17,19 @@ import (
     "github.com/martinsuchenak/go-dal/pkg/mysql"
 )
 
-db := mysql.NewMySQLDB(sqlDB)
+db := mysql.NewMySQLDB(sqlDB, nil)
 qb := mysql.NewQueryBuilder()
 
-query, args := qb.Select("id", "name").
+query, args, err := qb.Select("id", "name").
     From("users").
     Where("active = ?", true).
     OrWhere("role = ?", "admin").
     OrderBy("name").
     Limit(10).
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 
 rows, _ := db.Query(ctx, query, args...)
 ```

@@ -30,7 +30,7 @@ tests/integration/ Integration tests using Docker containers
 | `BaseDB` | `pkg/dal/logger.go` | Shared implementation with structured logging; drivers embed this |
 | `Tx` | `pkg/dal/logger.go` | Transaction wrapper with logging |
 | `Dialect` | `pkg/dal/dialect.go` | Interface for SQL generation (returns error) |
-| `BaseDialect` | `pkg/dal/dialect.go` | Common implementation configured by function fields (Placeholder, AppendLimit, AppendReturning, PrependReturning) + QuoteStyle |
+| `BaseDialect` | `pkg/dal/dialect.go` | Common implementation configured by function fields (Placeholder, AppendLimit, AppendReturning, AppendDeletedReturning, PrependReturning) + QuoteStyle |
 | `QueryBuilder` | `pkg/dal/query_builder.go` | Fluent API, delegates Build() to Dialect |
 | `SelectQuery` | `pkg/dal/types.go` | Fluent SELECT builder |
 | `InsertQuery` | `pkg/dal/types.go` | Fluent INSERT builder (single-row and batch) |

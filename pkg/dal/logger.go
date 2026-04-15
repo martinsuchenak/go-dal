@@ -3,6 +3,7 @@ package dal
 import (
 	"context"
 	"database/sql"
+	"sync"
 	"time"
 )
 
@@ -47,6 +48,7 @@ type DBExecutor interface {
 // and duration. Errors are logged at Error level.
 type BaseDB struct {
 	db      *sql.DB
+	mu      sync.RWMutex
 	log     Logger
 	logArgs bool
 }
@@ -59,72 +61,78 @@ func NewBaseDB(db *sql.DB, log Logger) *BaseDB {
 	return &BaseDB{db: db, log: log}
 }
 
-// SetLogger replaces the current logger. Pass nil to disable logging.
 func (b *BaseDB) SetLogger(log Logger) {
 	if log == nil {
 		log = noopLogger
 	}
+	b.mu.Lock()
 	b.log = log
+	b.mu.Unlock()
 }
 
-// SetLogArgs controls whether query arguments are included in log output.
-// Defaults to false (args are redacted). Set to true to log actual argument values.
 func (b *BaseDB) SetLogArgs(enabled bool) {
+	b.mu.Lock()
 	b.logArgs = enabled
+	b.mu.Unlock()
+}
+
+func (b *BaseDB) getLogger() Logger {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.log
+}
+
+func (b *BaseDB) getLogArgs() bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.logArgs
 }
 
 func (b *BaseDB) logArgsValue(args []interface{}) interface{} {
-	if b.logArgs {
+	if b.getLogArgs() {
 		return args
 	}
 	return "<redacted>"
 }
 
-// Exec executes a query without returning any rows, with logging.
 func (b *BaseDB) Exec(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
 	start := time.Now()
-	b.log.Debug("query exec", "query", query, "args", b.logArgsValue(args))
+	b.getLogger().Debug("query exec", "query", query, "args", b.logArgsValue(args))
 	result, err := b.db.ExecContext(ctx, query, args...)
 	elapsed := time.Since(start)
 	if err != nil {
-		b.log.Error("query exec error", "query", query, "error", err, "duration", elapsed)
+		b.getLogger().Error("query exec error", "query", query, "error", err, "duration", elapsed)
 		return nil, err
 	}
-	b.log.Debug("query exec done", "query", query, "duration", elapsed)
+	b.getLogger().Debug("query exec done", "query", query, "duration", elapsed)
 	return result, nil
 }
 
-// Query executes a query that returns rows, with logging.
 func (b *BaseDB) Query(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
 	start := time.Now()
-	b.log.Debug("query", "query", query, "args", b.logArgsValue(args))
+	b.getLogger().Debug("query", "query", query, "args", b.logArgsValue(args))
 	rows, err := b.db.QueryContext(ctx, query, args...)
 	elapsed := time.Since(start)
 	if err != nil {
-		b.log.Error("query error", "query", query, "error", err, "duration", elapsed)
+		b.getLogger().Error("query error", "query", query, "error", err, "duration", elapsed)
 		return nil, err
 	}
-	b.log.Debug("query done", "query", query, "duration", elapsed)
+	b.getLogger().Debug("query done", "query", query, "duration", elapsed)
 	return rows, nil
 }
 
-// QueryRow executes a query expected to return at most one row, with logging.
-// Note: duration and errors are not logged because *sql.Row defers execution
-// until Scan() is called on the returned Row.
 func (b *BaseDB) QueryRow(ctx context.Context, query string, args ...interface{}) *sql.Row {
-	b.log.Debug("query_row", "query", query, "args", b.logArgsValue(args))
+	b.getLogger().Debug("query_row", "query", query, "args", b.logArgsValue(args))
 	return b.db.QueryRowContext(ctx, query, args...)
 }
 
-// Close closes the underlying database connection, with logging.
 func (b *BaseDB) Close() error {
-	b.log.Debug("close")
+	b.getLogger().Debug("close")
 	return b.db.Close()
 }
 
-// Ping verifies the database connection is alive, with logging.
 func (b *BaseDB) Ping(ctx context.Context) error {
-	b.log.Debug("ping")
+	b.getLogger().Debug("ping")
 	return b.db.PingContext(ctx)
 }
 
@@ -165,15 +173,15 @@ type Tx struct {
 	logArgs bool
 }
 
-// BeginTx starts a transaction and returns a Tx wrapper with logging.
 func (b *BaseDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
-	b.log.Debug("begin_tx")
+	log := b.getLogger()
+	log.Debug("begin_tx")
 	tx, err := b.db.BeginTx(ctx, opts)
 	if err != nil {
-		b.log.Error("begin_tx error", "error", err)
+		log.Error("begin_tx error", "error", err)
 		return nil, err
 	}
-	return &Tx{tx: tx, log: b.log, logArgs: b.logArgs}, nil
+	return &Tx{tx: tx, log: log, logArgs: b.getLogArgs()}, nil
 }
 
 func (t *Tx) logArgsValue(args []interface{}) interface{} {

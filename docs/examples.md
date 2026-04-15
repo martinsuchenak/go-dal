@@ -5,22 +5,22 @@ All examples use MySQL. The same code works with PostgreSQL, SQLite, or SQL Serv
 ```go
 // MySQL
 import "github.com/martinsuchenak/go-dal/pkg/mysql"
-db := mysql.NewMySQLDB(sqlDB)
+db := mysql.NewMySQLDB(sqlDB, nil)
 qb := mysql.NewQueryBuilder()
 
 // PostgreSQL
 import "github.com/martinsuchenak/go-dal/pkg/postgres"
-db := postgres.NewPostgresDB(sqlDB)
+db := postgres.NewPostgresDB(sqlDB, nil)
 qb := postgres.NewQueryBuilder()
 
 // SQLite
 import "github.com/martinsuchenak/go-dal/pkg/sqlite"
-db := sqlite.NewSQLiteDB(sqlDB)
+db := sqlite.NewSQLiteDB(sqlDB, nil)
 qb := sqlite.NewQueryBuilder()
 
 // SQL Server
 import "github.com/martinsuchenak/go-dal/pkg/mssql"
-db := mssql.NewMSSQLDB(sqlDB)
+db := mssql.NewMSSQLDB(sqlDB, nil)
 qb := mssql.NewQueryBuilder()
 ```
 
@@ -48,7 +48,7 @@ func main() {
     }
     defer sqlDB.Close()
 
-    db := mysql.NewMySQLDB(sqlDB)
+    db := mysql.NewMySQLDB(sqlDB, nil)
     ctx := context.Background()
 
     // ... examples below use db and ctx
@@ -63,10 +63,13 @@ func main() {
 
 ```go
 qb := mysql.NewQueryBuilder()
-query, args := qb.Select("id", "name", "email").
+query, args, err := qb.Select("id", "name", "email").
     From("users").
     Where("active = ?", true).
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 
 rows, err := db.Query(ctx, query, args...)
 if err != nil {
@@ -85,103 +88,137 @@ for rows.Next() {
 ### Select all columns
 
 ```go
-query, args := qb.SelectAll().From("users").Build()
+query, args, err := qb.SelectAll().From("users").Build()
+if err != nil {
+    log.Fatal(err)
+}
 ```
 
 ### Select with multiple WHERE conditions
 
 ```go
-query, args := qb.Select("name").
+query, args, err := qb.Select("name").
     From("users").
     Where("active = ?", true).
     Where("age > ?", 18).
     Where("country = ?", "US").
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 // WHERE active = ? AND age > ? AND country = ?
 ```
 
 ### Select with OR
 
 ```go
-query, args := qb.Select("name").
+query, args, err := qb.Select("name").
     From("users").
     Where("role = ?", "admin").
     OrWhere("role = ?", "moderator").
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 // WHERE role = ? OR role = ?
 ```
 
 ### Select with IN clause
 
 ```go
-query, args := qb.Select("name").
+inVals, err := dal.In(1, 2, 3, 4, 5)
+if err != nil {
+    log.Fatal(err)
+}
+query, args, err := qb.Select("name").
     From("users").
-    Where("id IN (?)", dal.In(1, 2, 3, 4, 5)).
+    Where("id IN (?)", inVals).
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 // WHERE id IN (?, ?, ?, ?, ?)
 ```
 
 ### Select with JOIN
 
 ```go
-query, args := qb.Select("u.name", "o.total_price").
+query, args, err := qb.Select("u.name", "o.total_price").
     From("users u").
     Join("INNER JOIN orders o ON o.user_id = u.id").
     Where("o.total_price > ?", 100).
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 ```
 
 ### Select with three-table JOIN
 
 ```go
-query, args := qb.Select("u.name", "p.name", "oi.quantity").
+query, args, err := qb.Select("u.name", "p.name", "oi.quantity").
     From("order_items oi").
     Join("INNER JOIN orders o ON o.id = oi.order_id").
     Join("INNER JOIN users u ON u.id = o.user_id").
     Join("INNER JOIN products p ON p.id = oi.product_id").
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 ```
 
 ### Select with GROUP BY and HAVING
 
 ```go
-query, args := qb.Select("country", "COUNT(*) as cnt").
+query, args, err := qb.Select("country", "COUNT(*) as cnt").
     From("users").
     GroupBy("country").
     Having("COUNT(*) > ?", 5).
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 ```
 
 ### Select DISTINCT
 
 ```go
-query, args := qb.Select("country").Distinct().From("users").Build()
+query, args, err := qb.Select("country").Distinct().From("users").Build()
+if err != nil {
+    log.Fatal(err)
+}
 // SELECT DISTINCT `country` FROM `users`
 ```
 
 ### Select with ORDER BY, LIMIT, OFFSET
 
 ```go
-query, args := qb.Select("name").
+query, args, err := qb.Select("name").
     From("users").
     Where("active = ?", true).
     OrderBy("name ASC").
     Limit(10).
     Offset(20).
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 // page 3 of 10-item pages
 ```
 
 ### Select single row
 
 ```go
-query, args := qb.Select("name", "email").
+query, args, err := qb.Select("name", "email").
     From("users").
     Where("id = ?", 42).
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 
 var name, email string
-err := db.QueryRow(ctx, query, args...).Scan(&name, &email)
+err = db.QueryRow(ctx, query, args...).Scan(&name, &email)
 if err == sql.ErrNoRows {
     fmt.Println("not found")
 }
@@ -195,11 +232,14 @@ if err == sql.ErrNoRows {
 
 ```go
 qb := mysql.NewQueryBuilder()
-query, args := qb.Insert("users").
+query, args, err := qb.Insert("users").
     Set("name", "Alice").
     Set("email", "alice@example.com").
     Set("active", true).
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 
 result, err := db.Exec(ctx, query, args...)
 if err != nil {
@@ -212,12 +252,15 @@ fmt.Println("inserted id:", id)
 ### Batch insert
 
 ```go
-query, args := qb.Insert("users").
+query, args, err := qb.Insert("users").
     Columns("name", "email").
     Values("Alice", "alice@example.com").
     Values("Bob", "bob@example.com").
     Values("Charlie", "charlie@example.com").
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 // INSERT INTO `users` (`name`, `email`) VALUES (?, ?), (?, ?), (?, ?)
 
 result, err := db.Exec(ctx, query, args...)
@@ -229,11 +272,14 @@ result, err := db.Exec(ctx, query, args...)
 import "github.com/martinsuchenak/go-dal/pkg/postgres"
 
 qb := postgres.NewQueryBuilder()
-query, args := qb.Insert("users").
+query, args, err := qb.Insert("users").
     Set("name", "Alice").
     Returning("id").
     Build()
-// INSERT INTO "users" ("name") VALUES ($1) RETURNING id
+if err != nil {
+    log.Fatal(err)
+}
+// INSERT INTO "users" ("name") VALUES ($1) RETURNING "id"
 
 var id int
 db.QueryRow(ctx, query, args...).Scan(&id)
@@ -245,11 +291,14 @@ db.QueryRow(ctx, query, args...).Scan(&id)
 import "github.com/martinsuchenak/go-dal/pkg/mssql"
 
 qb := mssql.NewQueryBuilder()
-query, args := qb.Insert("users").
+query, args, err := qb.Insert("users").
     Set("name", "Alice").
     Returning("id").
     Build()
-// INSERT INTO [users] ([name]) VALUES (@p1) OUTPUT INSERTED.[id]
+if err != nil {
+    log.Fatal(err)
+}
+// INSERT INTO [users] ([name]) OUTPUT INSERTED.[id] VALUES (@p1)
 
 var id int
 db.QueryRow(ctx, query, args...).Scan(&id)
@@ -262,10 +311,13 @@ db.QueryRow(ctx, query, args...).Scan(&id)
 ### Basic update
 
 ```go
-query, args := qb.Update("users").
+query, args, err := qb.Update("users").
     Set("email", "new@example.com").
     Where("id = ?", 42).
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 
 result, err := db.Exec(ctx, query, args...)
 rowsAffected, _ := result.RowsAffected()
@@ -274,22 +326,28 @@ rowsAffected, _ := result.RowsAffected()
 ### Update multiple columns
 
 ```go
-query, args := qb.Update("users").
+query, args, err := qb.Update("users").
     Set("name", "Alice Smith").
     Set("email", "alice.smith@example.com").
     Set("updated_at", time.Now()).
     Where("id = ?", 1).
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 ```
 
 ### Update with OR in WHERE
 
 ```go
-query, args := qb.Update("users").
+query, args, err := qb.Update("users").
     Set("active", false).
     Where("last_login < ?", "2023-01-01").
     OrWhere("status = ?", "banned").
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 // UPDATE `users` SET `active` = ? WHERE last_login < ? OR status = ?
 ```
 
@@ -300,9 +358,12 @@ query, args := qb.Update("users").
 ### Delete with WHERE
 
 ```go
-query, args := qb.Delete("users").
+query, args, err := qb.Delete("users").
     Where("id = ?", 42).
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 
 result, err := db.Exec(ctx, query, args...)
 ```
@@ -310,25 +371,38 @@ result, err := db.Exec(ctx, query, args...)
 ### Delete all
 
 ```go
-query, args := qb.Delete("users").Build()
+query, args, err := qb.Delete("users").Build()
+if err != nil {
+    log.Fatal(err)
+}
 // DELETE FROM `users`
 ```
 
 ### Delete with OR
 
 ```go
-query, args := qb.Delete("sessions").
+query, args, err := qb.Delete("sessions").
     Where("expired_at < ?", time.Now()).
     OrWhere("user_id IS NULL").
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 ```
 
 ### Delete with IN clause
 
 ```go
-query, args := qb.Delete("users").
-    Where("id IN (?)", dal.In(1, 2, 3)).
+inVals, err := dal.In(1, 2, 3)
+if err != nil {
+    log.Fatal(err)
+}
+query, args, err := qb.Delete("users").
+    Where("id IN (?)", inVals).
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 // DELETE FROM `users` WHERE id IN (?, ?, ?)
 ```
 
@@ -345,10 +419,13 @@ if err != nil {
 }
 defer tx.Rollback()
 
-query, args := qb.Insert("orders").
+query, args, err := qb.Insert("orders").
     Set("user_id", 1).
     Set("total", 99.99).
     Build()
+if err != nil {
+    log.Fatal(err)
+}
 
 result, err := tx.Exec(ctx, query, args...)
 if err != nil {
@@ -387,10 +464,34 @@ tx.Exec(ctx, "UPDATE accounts SET balance = balance - ? WHERE id = ?", 100, 1)
 tx.Exec(ctx, "UPDATE accounts SET balance = balance + ? WHERE id = ?", 100, 2)
 
 var balance float64
-query, args := qb.Select("balance").From("accounts").Where("id = ?", 2).Build()
+query, args, err := qb.Select("balance").From("accounts").Where("id = ?", 2).Build()
+if err != nil {
+    log.Fatal(err)
+}
 tx.QueryRow(ctx, query, args...).Scan(&balance)
 
 tx.Commit()
+```
+
+### Using WithTx helper
+
+```go
+err := db.WithTx(ctx, nil, func(tx *dal.Tx) error {
+    query, args, err := qb.Insert("orders").
+        Set("user_id", 1).
+        Set("total", 99.99).
+        Build()
+    if err != nil {
+        return err
+    }
+    if _, err := tx.Exec(ctx, query, args...); err != nil {
+        return err
+    }
+    return nil
+})
+if err != nil {
+    log.Fatal(err)
+}
 ```
 
 ---
@@ -433,4 +534,11 @@ db.SetLogger(newLogger)
 
 ```go
 db.SetLogger(nil)
+```
+
+### Enable argument logging
+
+```go
+db.SetLogArgs(true)  // args will appear in logs
+db.SetLogArgs(false) // args will be redacted (default)
 ```

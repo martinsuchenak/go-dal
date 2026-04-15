@@ -46,3 +46,25 @@ func TestNewQueryBuilderSelectWhere(t *testing.T) {
 func TestInterfaceCompliance(t *testing.T) {
 	var _ dal.DBInterface = (*MySQLDB)(nil)
 }
+
+func TestExpressionDefaults(t *testing.T) {
+	d := NewDialect()
+	if got := d.ConcatExpr("a", "b"); got != "CONCAT(a, b)" {
+		t.Errorf("ConcatExpr = %q, want CONCAT(a, b)", got)
+	}
+	if got := d.LengthExpr("name"); got != "LENGTH(name)" {
+		t.Errorf("LengthExpr = %q, want LENGTH(name)", got)
+	}
+	if got := d.CurrentTimestamp(); got != "NOW()" {
+		t.Errorf("CurrentTimestamp = %q, want NOW()", got)
+	}
+	if got := d.BoolLiteral(true); got != "TRUE" {
+		t.Errorf("BoolLiteral(true) = %q, want TRUE", got)
+	}
+	if got := d.StringAggExpr("name", "', '"); got != "GROUP_CONCAT(name SEPARATOR ', ')" {
+		t.Errorf("StringAggExpr = %q, want GROUP_CONCAT(name SEPARATOR ', ')", got)
+	}
+	if got := d.RandExpr(); got != "RAND()" {
+		t.Errorf("RandExpr = %q, want RAND()", got)
+	}
+}

@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"testing"
 )
 
@@ -86,6 +87,79 @@ func TestInsertReturningMultipleColumns(t *testing.T) {
 		}
 		if name != "Eve" {
 			t.Errorf("got name %q, want 'Eve'", name)
+		}
+	})
+}
+
+func TestUpdateReturning(t *testing.T) {
+	runForEachDBWithSeed(t, func(t *testing.T, td *testDB) {
+		if td.name == "mysql" {
+			t.Skip("MySQL doesn't support RETURNING")
+		}
+		ctx := context.Background()
+		qb := td.builder()
+
+		query, args, err := qb.Update("users").
+			Set("name", "Updated").
+			Where("id = ?", 1).
+			Returning("id", "name").
+			Build()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var id int
+		var name string
+		err = td.dalDB.QueryRow(ctx, query, args...).Scan(&id, &name)
+		if err != nil {
+			t.Fatalf("update returning failed: %v", err)
+		}
+		if id != 1 {
+			t.Errorf("got id %d, want 1", id)
+		}
+		if name != "Updated" {
+			t.Errorf("got name %q, want 'Updated'", name)
+		}
+	})
+}
+
+func TestDeleteReturning(t *testing.T) {
+	runForEachDBWithSeed(t, func(t *testing.T, td *testDB) {
+		if td.name == "mysql" {
+			t.Skip("MySQL doesn't support RETURNING")
+		}
+		ctx := context.Background()
+
+		_, err := td.dalDB.Exec(ctx, "DELETE FROM orders WHERE user_id = 3")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = td.dalDB.Exec(ctx, fmt.Sprintf("INSERT INTO users (name, email, active) VALUES ('ToDelete', 'del@test.com', %s)", td.dialect.BoolLiteral(false)))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		qb := td.builder()
+		query, args, err := qb.Delete("users").
+			Where("name = ?", "ToDelete").
+			Returning("id", "name").
+			Build()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var id int
+		var name string
+		err = td.dalDB.QueryRow(ctx, query, args...).Scan(&id, &name)
+		if err != nil {
+			t.Fatalf("delete returning failed: %v", err)
+		}
+		if id <= 0 {
+			t.Errorf("got id %d, want positive", id)
+		}
+		if name != "ToDelete" {
+			t.Errorf("got name %q, want 'ToDelete'", name)
 		}
 	})
 }

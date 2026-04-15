@@ -65,3 +65,28 @@ func TestNewQueryBuilderUpdate(t *testing.T) {
 func TestInterfaceCompliance(t *testing.T) {
 	var _ dal.DBInterface = (*MSSQLDB)(nil)
 }
+
+func TestExpressionOverrides(t *testing.T) {
+	d := NewDialect()
+	if got := d.ConcatExpr("a", "b", "c"); got != "a + b + c" {
+		t.Errorf("ConcatExpr = %q, want a + b + c", got)
+	}
+	if got := d.LengthExpr("name"); got != "LEN(name)" {
+		t.Errorf("LengthExpr = %q, want LEN(name)", got)
+	}
+	if got := d.CurrentTimestamp(); got != "GETDATE()" {
+		t.Errorf("CurrentTimestamp = %q, want GETDATE()", got)
+	}
+	if got := d.BoolLiteral(true); got != "1" {
+		t.Errorf("BoolLiteral(true) = %q, want 1", got)
+	}
+	if got := d.BoolLiteral(false); got != "0" {
+		t.Errorf("BoolLiteral(false) = %q, want 0", got)
+	}
+	if got := d.StringAggExpr("name", "', '"); got != "STRING_AGG(name, ', ')" {
+		t.Errorf("StringAggExpr = %q, want STRING_AGG(name, ', ')", got)
+	}
+	if got := d.RandExpr(); got != "RAND()" {
+		t.Errorf("RandExpr = %q, want RAND()", got)
+	}
+}

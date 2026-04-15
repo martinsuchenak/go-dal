@@ -117,20 +117,20 @@ func (q *SelectQuery) OrWhereGroup(fn func(*WhereGroup)) *SelectQuery {
 
 // WhereIsNull adds "column IS NULL" condition.
 func (q *SelectQuery) WhereIsNull(column string) *SelectQuery {
-	q.wheres = append(q.wheres, whereClause{condition: fmt.Sprintf("%s IS NULL", column), connector: andConnector})
+	q.wheres = append(q.wheres, whereClause{condition: fmt.Sprintf("%s IS NULL", q.dialect.QuoteIdentifier(column)), connector: andConnector})
 	return q
 }
 
 // WhereIsNotNull adds "column IS NOT NULL" condition.
 func (q *SelectQuery) WhereIsNotNull(column string) *SelectQuery {
-	q.wheres = append(q.wheres, whereClause{condition: fmt.Sprintf("%s IS NOT NULL", column), connector: andConnector})
+	q.wheres = append(q.wheres, whereClause{condition: fmt.Sprintf("%s IS NOT NULL", q.dialect.QuoteIdentifier(column)), connector: andConnector})
 	return q
 }
 
 // WhereBetween adds "column BETWEEN low AND high" condition.
 func (q *SelectQuery) WhereBetween(column string, low, high interface{}) *SelectQuery {
 	q.wheres = append(q.wheres, whereClause{
-		condition: fmt.Sprintf("%s BETWEEN ? AND ?", column),
+		condition: fmt.Sprintf("%s BETWEEN ? AND ?", q.dialect.QuoteIdentifier(column)),
 		args:      []interface{}{low, high},
 		connector: andConnector,
 	})

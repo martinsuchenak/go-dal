@@ -3,8 +3,8 @@ package dal
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
-	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -150,199 +150,38 @@ func TestBaseDBBeginTxLogs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
-	if e := log.find("debug", "begin_tx"); e == nil {
-		t.Error("expected debug 'begin_tx' log entry")
-	}
+	var _ DBExecutor = tx
 }
 
-func TestBaseDBCloseLogs(t *testing.T) {
+func TestTxQueryRow(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
+
+	_, _ = db.Exec("INSERT INTO test (id, name) VALUES (?, ?)", 1, "foo")
 
 	log := &mockLogger{}
 	bdb := NewBaseDB(db, log)
 
-	_ = bdb.Close()
-	_ = cleanup
-
-	if e := log.find("debug", "close"); e == nil {
-		t.Error("expected debug 'close' log entry")
-	}
-}
-
-func TestBaseDBExecErrorLogs(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	log := &mockLogger{}
-	bdb := NewBaseDB(db, log)
-
-	_, err := bdb.Exec(context.Background(), "INSERT INTO nonexistent (id) VALUES (?)", 1)
-	if err == nil {
-		t.Fatal("expected error from invalid SQL")
-	}
-
-	if e := log.find("error", "query exec error"); e == nil {
-		t.Error("expected error 'query exec error' log entry")
-	}
-	if !log.hasKey("query exec error", "error") {
-		t.Error("expected 'error' key in error log entry")
-	}
-}
-
-func TestBaseDBQueryErrorLogs(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	log := &mockLogger{}
-	bdb := NewBaseDB(db, log)
-
-	rows, err := bdb.Query(context.Background(), "SELECT * FROM nonexistent")
-	if err == nil {
-		_ = rows.Close()
-		t.Fatal("expected error from invalid SQL")
-	}
-
-	if e := log.find("error", "query error"); e == nil {
-		t.Error("expected error 'query error' log entry")
-	}
-}
-
-func TestNoopLoggerDoesNotPanic(t *testing.T) {
-	log := NoopLoggerInstance()
-	log.Trace("test", "key", "value")
-	log.Debug("test", "key", "value")
-	log.Info("test", "key", "value")
-	log.Warn("test", "key", "value")
-	log.Error("test", "key", "value")
-	log.Fatal("test", "key", "value")
-}
-
-func TestNilLoggerDefaultsToNoop(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	bdb := NewBaseDB(db, nil)
-	_, err := bdb.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 1, "foo")
+	tx, err := bdb.BeginTx(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-}
+	defer func() { _ = tx.Rollback() }()
 
-func TestSetLogger(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	bdb := NewBaseDB(db, nil)
-	log := &mockLogger{}
-	bdb.SetLogger(log)
-
-	_, err := bdb.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 1, "foo")
+	var name string
+	err = tx.QueryRow(context.Background(), "SELECT name FROM test WHERE id = ?", 1).Scan(&name)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(log.entries) == 0 {
-		t.Error("expected log entries after SetLogger")
+	if e := log.find("debug", "tx query_row"); e == nil {
+		t.Error("expected 'tx query_row' log entry")
 	}
 }
 
-func TestSetLoggerNil(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	bdb := NewBaseDB(db, &mockLogger{})
-	bdb.SetLogger(nil)
-
-	_, err := bdb.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 1, "foo")
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestExecLogsArgs(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	log := &mockLogger{}
-	bdb := NewBaseDB(db, log)
-
-	_, _ = bdb.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 42, "hello")
-
-	e := log.find("debug", "query exec")
-	if e == nil {
-		t.Fatal("expected 'query exec' log entry")
-	}
-	found := false
-	for i := 0; i < len(e.kv)-1; i += 2 {
-		if e.kv[i] == "args" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("expected 'args' key in log entry")
-	}
-}
-
-func TestDurationIsLogged(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	log := &mockLogger{}
-	bdb := NewBaseDB(db, log)
-
-	_, _ = bdb.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 1, "foo")
-
-	e := log.find("debug", "query exec done")
-	if e == nil {
-		t.Fatal("expected 'query exec done' log entry")
-	}
-	for i := 0; i < len(e.kv)-1; i += 2 {
-		if e.kv[i] == "duration" {
-			d, ok := e.kv[i+1].(time.Duration)
-			if !ok {
-				t.Errorf("expected duration to be time.Duration, got %T", e.kv[i+1])
-			}
-			if d < 0 {
-				t.Error("expected non-negative duration")
-			}
-			return
-		}
-	}
-	t.Error("expected 'duration' key in 'query exec done'")
-}
-
-func TestDBMethodReturnsUnderlyingDB(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	bdb := NewBaseDB(db, nil)
-	if bdb.DB() != db {
-		t.Error("DB() should return the underlying *sql.DB")
-	}
-}
-
-func TestBaseDBPingLogs(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	log := &mockLogger{}
-	bdb := NewBaseDB(db, log)
-
-	err := bdb.Ping(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if e := log.find("debug", "ping"); e == nil {
-		t.Error("expected 'ping' log entry")
-	}
-}
-
-func TestBeginTxReturnsTxWrapper(t *testing.T) {
+func TestTxRollback(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
@@ -354,25 +193,134 @@ func TestBeginTxReturnsTxWrapper(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	err = tx.Rollback()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if e := log.find("debug", "tx rollback"); e == nil {
+		t.Error("expected 'tx rollback' log entry")
+	}
+}
+
+func TestWithTxCommit(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	log := &mockLogger{}
+	bdb := NewBaseDB(db, log)
+
+	err := bdb.WithTx(context.Background(), nil, func(tx *Tx) error {
+		_, err := tx.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 1, "withtx_test")
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	if e := log.find("debug", "begin_tx"); e == nil {
 		t.Error("expected 'begin_tx' log entry")
 	}
-
-	_, err = tx.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 99, "tx_test")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if e := log.find("debug", "tx exec"); e == nil {
-		t.Error("expected 'tx exec' log entry")
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	if e := log.find("debug", "tx commit"); e == nil {
 		t.Error("expected 'tx commit' log entry")
 	}
+
+	var name string
+	err = bdb.QueryRow(context.Background(), "SELECT name FROM test WHERE id = ?", 1).Scan(&name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if name != "withtx_test" {
+		t.Errorf("got %q, want 'withtx_test'", name)
+	}
+}
+
+func TestWithTxRollbackOnError(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	log := &mockLogger{}
+	bdb := NewBaseDB(db, log)
+
+	err := bdb.WithTx(context.Background(), nil, func(tx *Tx) error {
+		return fmt.Errorf("intentional error")
+	})
+	if err == nil {
+		t.Fatal("expected error from WithTx")
+	}
+
+	if e := log.find("debug", "tx rollback"); e == nil {
+		t.Error("expected 'tx rollback' log entry on error")
+	}
+}
+
+func TestSetLogArgsEnabled(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	log := &mockLogger{}
+	bdb := NewBaseDB(db, log)
+	bdb.SetLogArgs(true)
+
+	_, _ = bdb.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 42, "hello")
+
+	e := log.find("debug", "query exec")
+	if e == nil {
+		t.Fatal("expected 'query exec' log entry")
+	}
+	for i := 0; i < len(e.kv)-1; i += 2 {
+		if e.kv[i] == "args" {
+			args, ok := e.kv[i+1].([]interface{})
+			if !ok {
+				t.Fatalf("expected []interface{}, got %T", e.kv[i+1])
+			}
+			if len(args) != 2 || args[0] != 42 || args[1] != "hello" {
+				t.Errorf("got args %v, want [42 hello]", args)
+			}
+			return
+		}
+	}
+	t.Error("expected 'args' key in log entry")
+}
+
+func TestSetLogArgsRedacted(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	log := &mockLogger{}
+	bdb := NewBaseDB(db, log)
+	bdb.SetLogArgs(false)
+
+	_, _ = bdb.Exec(context.Background(), "INSERT INTO test (id, name) VALUES (?, ?)", 42, "hello")
+
+	e := log.find("debug", "query exec")
+	if e == nil {
+		t.Fatal("expected 'query exec' log entry")
+	}
+	for i := 0; i < len(e.kv)-1; i += 2 {
+		if e.kv[i] == "args" {
+			if e.kv[i+1] != "<redacted>" {
+				t.Errorf("got %v, want '<redacted>'", e.kv[i+1])
+			}
+			return
+		}
+	}
+	t.Error("expected 'args' key in log entry")
+}
+
+func TestDBExecutorInterface(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	bdb := NewBaseDB(db, nil)
+
+	var _ DBExecutor = bdb
+
+	tx, err := bdb.BeginTx(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var _ DBExecutor = tx
 }

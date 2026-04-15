@@ -46,3 +46,22 @@ func TestNewQueryBuilderSelectWhere(t *testing.T) {
 func TestInterfaceCompliance(t *testing.T) {
 	var _ dal.DBInterface = (*SQLiteDB)(nil)
 }
+
+func TestExpressionOverrides(t *testing.T) {
+	d := NewDialect()
+	if got := d.CurrentTimestamp(); got != "datetime('now')" {
+		t.Errorf("CurrentTimestamp = %q, want datetime('now')", got)
+	}
+	if got := d.BoolLiteral(true); got != "1" {
+		t.Errorf("BoolLiteral(true) = %q, want 1", got)
+	}
+	if got := d.BoolLiteral(false); got != "0" {
+		t.Errorf("BoolLiteral(false) = %q, want 0", got)
+	}
+	if got := d.StringAggExpr("name", "', '"); got != "GROUP_CONCAT(name, ', ')" {
+		t.Errorf("StringAggExpr = %q, want GROUP_CONCAT(name, ', ')", got)
+	}
+	if got := d.RandExpr(); got != "RANDOM()" {
+		t.Errorf("RandExpr = %q, want RANDOM()", got)
+	}
+}

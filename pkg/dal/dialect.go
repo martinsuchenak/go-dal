@@ -1,7 +1,6 @@
 package dal
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -107,6 +106,10 @@ type BaseDialect struct {
 	// PrependReturning inserts a returning clause before the VALUES clause in INSERT.
 	// Set to d.WriteOutput for MSSQL, or nil for other databases.
 	PrependReturning func(b *strings.Builder, columns []string)
+
+	// AppendDeletedReturning appends a returning clause after the WHERE clause in DELETE,
+	// using the DELETED prefix (MSSQL only). Set to d.WriteDeletedOutput for MSSQL.
+	AppendDeletedReturning func(b *strings.Builder, columns []string)
 }
 
 // SupportsReturning returns true when any returning hook is configured.
@@ -263,7 +266,7 @@ func (d *BaseDialect) buildClauses(clauses []whereClause, paramIdx int, args []i
 				if len(in) == 0 {
 					return "", 0, nil, ErrEmptyInValues
 				}
-				condition = expandInPlaceholders(condition, len(in))
+				condition = d.expandInPlaceholders(condition, len(in))
 				expandedArgs = append(expandedArgs, []interface{}(in)...)
 			} else {
 				expandedArgs = append(expandedArgs, arg)
@@ -287,8 +290,8 @@ func (d *BaseDialect) buildClauses(clauses []whereClause, paramIdx int, args []i
 }
 
 // expandInPlaceholders replaces the first unquoted "?" with N placeholders.
-func expandInPlaceholders(condition string, count int) string {
-	idx := findFirstUnquotedPlaceholder(condition)
+func (d *BaseDialect) expandInPlaceholders(condition string, count int) string {
+	idx := d.findFirstUnquotedPlaceholder(condition)
 	if idx == -1 {
 		return condition
 	}
@@ -305,13 +308,17 @@ func expandInPlaceholders(condition string, count int) string {
 	return b.String()
 }
 
-func findFirstUnquotedPlaceholder(s string) int {
+func (d *BaseDialect) findFirstUnquotedPlaceholder(s string) int {
 	inSingle, inDouble := false, false
 	for i := 0; i < len(s); i++ {
 		ch := s[i]
 		switch {
 		case inSingle:
-			if ch == '\'' {
+			if d.BackslashEscapes && ch == '\\' {
+				if i+1 < len(s) {
+					i++
+				}
+			} else if ch == '\'' {
 				if i+1 < len(s) && s[i+1] == '\'' {
 					i++
 				} else {
@@ -319,7 +326,11 @@ func findFirstUnquotedPlaceholder(s string) int {
 				}
 			}
 		case inDouble:
-			if ch == '"' {
+			if d.BackslashEscapes && ch == '\\' {
+				if i+1 < len(s) {
+					i++
+				}
+			} else if ch == '"' {
 				if i+1 < len(s) && s[i+1] == '"' {
 					i++
 				} else {
@@ -398,11 +409,22 @@ func (d *BaseDialect) WriteReturning(b *strings.Builder, columns []string) {
 // WriteOutput appends " OUTPUT INSERTED.col1, INSERTED.col2" using the dialect's quoting.
 // Use as: d.PrependReturning = d.WriteOutput  (for INSERT)
 //
-//	or: d.AppendReturning = d.WriteOutput   (for UPDATE/DELETE)
+//	or: d.AppendReturning = d.WriteOutput   (for UPDATE)
 func (d *BaseDialect) WriteOutput(b *strings.Builder, columns []string) {
 	quoted := make([]string, len(columns))
 	for i, c := range columns {
 		quoted[i] = "INSERTED." + d.QuoteIdentifier(c)
+	}
+	b.WriteString(" OUTPUT ")
+	b.WriteString(strings.Join(quoted, ", "))
+}
+
+// WriteDeletedOutput appends " OUTPUT DELETED.col1, DELETED.col2" using the dialect's quoting.
+// Use as: d.AppendDeletedReturning = d.WriteDeletedOutput   (for DELETE)
+func (d *BaseDialect) WriteDeletedOutput(b *strings.Builder, columns []string) {
+	quoted := make([]string, len(columns))
+	for i, c := range columns {
+		quoted[i] = "DELETED." + d.QuoteIdentifier(c)
 	}
 	b.WriteString(" OUTPUT ")
 	b.WriteString(strings.Join(quoted, ", "))
@@ -480,6 +502,9 @@ func (d *BaseDialect) BuildSelect(q *SelectQuery) (string, []interface{}, error)
 }
 
 func (d *BaseDialect) BuildInsert(q *InsertQuery) (string, []interface{}, error) {
+	if q.table == "" {
+		return "", nil, ErrEmptyTable
+	}
 	if len(q.keys) == 0 && len(q.rows) == 0 {
 		return "", nil, ErrEmptyColumns
 	}
@@ -587,6 +612,10 @@ func (d *BaseDialect) BuildUpdate(q *UpdateQuery) (string, []interface{}, error)
 	copy(args, q.values)
 	paramIdx := len(q.keys) + 1
 
+	if len(q.returning) > 0 && d.PrependReturning != nil {
+		d.PrependReturning(&b, q.returning)
+	}
+
 	if len(q.wheres) > 0 {
 		whereStr, _, newArgs, err := d.buildClauses(q.wheres, paramIdx, args)
 		if err != nil {
@@ -597,10 +626,8 @@ func (d *BaseDialect) BuildUpdate(q *UpdateQuery) (string, []interface{}, error)
 		b.WriteString(whereStr)
 	}
 
-	if len(q.returning) > 0 {
-		if len(q.returning) > 0 && d.AppendReturning != nil {
-			d.AppendReturning(&b, q.returning)
-		}
+	if len(q.returning) > 0 && d.PrependReturning == nil && d.AppendReturning != nil {
+		d.AppendReturning(&b, q.returning)
 	}
 
 	return b.String(), args, nil
@@ -622,6 +649,14 @@ func (d *BaseDialect) BuildDelete(q *DeleteQuery) (string, []interface{}, error)
 	var args []interface{}
 	paramIdx := 1
 
+	if len(q.returning) > 0 {
+		if d.AppendDeletedReturning != nil {
+			d.AppendDeletedReturning(&b, q.returning)
+		} else if d.PrependReturning != nil {
+			d.PrependReturning(&b, q.returning)
+		}
+	}
+
 	if len(q.wheres) > 0 {
 		whereStr, _, newArgs, err := d.buildClauses(q.wheres, paramIdx, args)
 		if err != nil {
@@ -632,10 +667,8 @@ func (d *BaseDialect) BuildDelete(q *DeleteQuery) (string, []interface{}, error)
 		b.WriteString(whereStr)
 	}
 
-	if len(q.returning) > 0 {
-		if len(q.returning) > 0 && d.AppendReturning != nil {
-			d.AppendReturning(&b, q.returning)
-		}
+	if len(q.returning) > 0 && d.AppendDeletedReturning == nil && d.PrependReturning == nil && d.AppendReturning != nil {
+		d.AppendReturning(&b, q.returning)
 	}
 
 	return b.String(), args, nil
@@ -662,6 +695,3 @@ func SafeIdentifier(name string) error {
 	}
 	return nil
 }
-
-// ErrNotImplemented is returned for features not yet implemented.
-var ErrNotImplemented = errors.New("dal: feature not implemented")

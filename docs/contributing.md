@@ -23,6 +23,7 @@ go-dal/
 │   │   ├── types.go            # DBInterface, query structs, error sentinels
 │   │   ├── query_builder.go    # QueryBuilder, fluent methods, In() helper
 │   │   ├── dialect.go          # Dialect interface, BaseDialect, QuoteIdentifier
+│   │   ├── expressions.go      # Portable SQL expression helpers (ConcatExpr, LengthExpr, etc.)
 │   │   └── logger.go           # Logger interface, NoopLogger, BaseDB, Tx
 │   ├── mysql/
 │   │   ├── mysql.go            # MySQLDB (embeds BaseDB), NewQueryBuilder

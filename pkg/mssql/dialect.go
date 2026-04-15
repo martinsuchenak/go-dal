@@ -42,5 +42,6 @@ func NewDialect() dal.Dialect {
 	}
 	b.PrependReturning = b.WriteOutput
 	b.AppendReturning = b.WriteOutput
+	b.AppendDeletedReturning = b.WriteDeletedOutput
 	return &mssqlDialect{BaseDialect: b}
 }

@@ -691,6 +691,7 @@ func newAtPDialectWithQuoting() *BaseDialect {
 	d := &BaseDialect{Placeholder: AtPPlaceholder, AppendLimit: FetchNextLimit, QuoteStyle: BracketQuoting}
 	d.PrependReturning = d.WriteOutput
 	d.AppendReturning = d.WriteOutput
+	d.AppendDeletedReturning = d.WriteDeletedOutput
 	return d
 }
 
@@ -841,7 +842,7 @@ func TestUpdateReturningAtP(t *testing.T) {
 		Build()
 
 	assertNoError(t, err)
-	assertQuery(t, query, "UPDATE [users] SET [name] = @p1 WHERE id = @p2 OUTPUT INSERTED.[id], INSERTED.[name]")
+	assertQuery(t, query, "UPDATE [users] SET [name] = @p1 OUTPUT INSERTED.[id], INSERTED.[name] WHERE id = @p2")
 	assertArgs(t, args, "Alice", 1)
 }
 
@@ -866,7 +867,7 @@ func TestDeleteReturningAtP(t *testing.T) {
 		Build()
 
 	assertNoError(t, err)
-	assertQuery(t, query, "DELETE FROM [users] WHERE id = @p1 OUTPUT INSERTED.[id]")
+	assertQuery(t, query, "DELETE FROM [users] OUTPUT DELETED.[id] WHERE id = @p1")
 	assertArgs(t, args, 1)
 }
 
@@ -908,6 +909,100 @@ func TestSafeIdentifier(t *testing.T) {
 	if err := SafeIdentifier("123abc"); err == nil {
 		t.Error("expected error for identifier starting with digit")
 	}
+}
+
+func TestOrHaving(t *testing.T) {
+	qb := NewQueryBuilder(defaultDialect())
+	query, args, err := qb.Select("country", "COUNT(*) as cnt").
+		From("users").
+		GroupBy("country").
+		Having("COUNT(*) > ?", 10).
+		OrHaving("AVG(score) < ?", 5).
+		Build()
+
+	assertNoError(t, err)
+	assertQuery(t, query, "SELECT country, COUNT(*) as cnt FROM users GROUP BY country HAVING COUNT(*) > ? OR AVG(score) < ?")
+	assertArgs(t, args, 10, 5)
+}
+
+func TestOrHavingWithDollarPlaceholders(t *testing.T) {
+	qb := NewQueryBuilder(dollarDialect())
+	query, args, err := qb.Select("country", "COUNT(*) as cnt").
+		From("users").
+		GroupBy("country").
+		Having("COUNT(*) > ?", 10).
+		OrHaving("AVG(score) < ?", 5).
+		Build()
+
+	assertNoError(t, err)
+	assertQuery(t, query, "SELECT country, COUNT(*) as cnt FROM users GROUP BY country HAVING COUNT(*) > $1 OR AVG(score) < $2")
+	assertArgs(t, args, 10, 5)
+}
+
+func TestErrReturningNotSupported(t *testing.T) {
+	d := &BaseDialect{Placeholder: QuestionMarkPlaceholder, AppendLimit: LimitOffset}
+	qb := NewQueryBuilder(d)
+	_, _, err := qb.Insert("users").Set("name", "Alice").Returning("id").Build()
+	if err != ErrReturningNotSupported {
+		t.Errorf("got err %v, want ErrReturningNotSupported", err)
+	}
+	_, _, err = qb.Update("users").Set("name", "Alice").Where("id = ?", 1).Returning("id").Build()
+	if err != ErrReturningNotSupported {
+		t.Errorf("got err %v, want ErrReturningNotSupported", err)
+	}
+	_, _, err = qb.Delete("users").Where("id = ?", 1).Returning("id").Build()
+	if err != ErrReturningNotSupported {
+		t.Errorf("got err %v, want ErrReturningNotSupported", err)
+	}
+}
+
+func TestInsertEmptyTable(t *testing.T) {
+	qb := NewQueryBuilder(defaultDialect())
+	_, _, err := qb.Insert("").Set("name", "Alice").Build()
+	if err != ErrEmptyTable {
+		t.Errorf("got err %v, want ErrEmptyTable", err)
+	}
+}
+
+func TestWhereIsNullWithQuoting(t *testing.T) {
+	d := &BaseDialect{Placeholder: QuestionMarkPlaceholder, AppendLimit: LimitOffset, QuoteStyle: BacktickQuoting}
+	qb := NewQueryBuilder(d)
+	query, _, err := qb.Select("id").From("users").WhereIsNull("email").Build()
+	assertNoError(t, err)
+	assertQuery(t, query, "SELECT `id` FROM `users` WHERE `email` IS NULL")
+}
+
+func TestWhereBetweenWithQuoting(t *testing.T) {
+	d := &BaseDialect{Placeholder: DollarPlaceholder, AppendLimit: LimitOffset, QuoteStyle: DoubleQuoteQuoting}
+	qb := NewQueryBuilder(d)
+	query, args, err := qb.Select("id").From("users").WhereBetween("age", 18, 65).Build()
+	assertNoError(t, err)
+	assertQuery(t, query, `SELECT "id" FROM "users" WHERE "age" BETWEEN $1 AND $2`)
+	assertArgs(t, args, 18, 65)
+}
+
+func TestInExactlyMaxValues(t *testing.T) {
+	vals := make([]interface{}, MaxInValues)
+	for i := range vals {
+		vals[i] = i
+	}
+	inVals, err := In(vals...)
+	if err != nil {
+		t.Errorf("In() with exactly MaxInValues should succeed, got err: %v", err)
+	}
+	if len(inVals) != MaxInValues {
+		t.Errorf("got %d values, want %d", len(inVals), MaxInValues)
+	}
+}
+
+func TestInSingleValue(t *testing.T) {
+	inVals, err := In(42)
+	assertNoError(t, err)
+	qb := NewQueryBuilder(defaultDialect())
+	query, args, err := qb.Select("id").From("users").Where("id IN (?)", inVals).Build()
+	assertNoError(t, err)
+	assertQuery(t, query, "SELECT id FROM users WHERE id IN (?)")
+	assertArgs(t, args, 42)
 }
 
 func assertNoError(t *testing.T, err error) {

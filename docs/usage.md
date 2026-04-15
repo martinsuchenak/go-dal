@@ -456,6 +456,12 @@ type Dialect interface {
     BuildDelete(q *DeleteQuery) (string, []interface{}, error)
     QuoteIdentifier(name string) string
     SupportsReturning() bool
+    ConcatExpr(parts ...string) string
+    LengthExpr(col string) string
+    CurrentTimestamp() string
+    BoolLiteral(v bool) string
+    StringAggExpr(col, sep string) string
+    RandExpr() string
 }
 ```
 
@@ -531,12 +537,13 @@ Quoting is skipped for expressions containing spaces, parentheses, commas, or `A
 
 ### RETURNING/OUTPUT Handling
 
-| Hook | Dialects | INSERT | UPDATE/DELETE |
-|------|----------|--------|---------------|
-| none | MySQL | not supported | not supported |
-| `AppendReturning = WriteReturning` | PostgreSQL, SQLite | `... VALUES (...) RETURNING col` | `... WHERE ... RETURNING col` |
-| `PrependReturning = WriteOutput` | SQL Server | `... OUTPUT INSERTED.col VALUES (...)` | — |
-| `AppendReturning = WriteOutput` | SQL Server | — | `... WHERE ... OUTPUT INSERTED.col` |
+| Hook | Dialects | INSERT | UPDATE | DELETE |
+|------|----------|--------|--------|--------|
+| none | MySQL | not supported | not supported | not supported |
+| `AppendReturning = WriteReturning` | PostgreSQL, SQLite | `... VALUES (...) RETURNING col` | `... WHERE ... RETURNING col` | `... WHERE ... RETURNING col` |
+| `PrependReturning = WriteOutput` | SQL Server | `... OUTPUT INSERTED.col VALUES (...)` | — | — |
+| `AppendReturning = WriteOutput` | SQL Server | — | `... OUTPUT INSERTED.col WHERE ...` | — |
+| `AppendDeletedReturning = WriteDeletedOutput` | SQL Server | — | — | `... OUTPUT DELETED.col WHERE ...` |
 
 ### SafeIdentifier
 

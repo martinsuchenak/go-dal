@@ -105,9 +105,21 @@ GO-DAL is a lightweight, interface-driven database abstraction layer for Go that
 - [x] Contributing guide in `docs/contributing.md`
 - [x] GoDoc comments on all exported types and methods
 
-## Phase 9: Finalization
+## Phase 10: Finalization
 - [x] Removed 80 lines of redundant driver forwarding methods
 - [x] Merged replacePlaceholders + countPlaceholders into single-pass replaceAndCount
 - [x] Cross-database compatibility (MSSQL FETCH NEXT, identifier quoting)
 - [x] Full test suite passing
+
+## Phase 11: Comprehensive Review Fixes
+- [x] Fix WhereIsNull/WhereIsNotNull/WhereBetween to quote column names
+- [x] Fix BuildInsert missing empty table validation
+- [x] Fix findFirstUnquotedPlaceholder to handle backslash escapes (MySQL)
+- [x] Fix WriteOutput to use DELETED. prefix for DELETE queries
+- [x] Fix race condition on SetLogger/SetLogArgs with sync.RWMutex
+- [x] Remove dead code (ErrNotImplemented, redundant double-checks)
+- [x] Fix all documentation compilation errors (Build() 3-value, constructor 2-param, In() error)
+- [x] Fix Dialect interface docs to include expression methods
+- [x] Fix contributing.md to include expressions.go
+- [x] Fix PLAN.md duplicate Phase 9 numbering
 - [ ] Tag initial release

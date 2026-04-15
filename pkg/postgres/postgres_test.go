@@ -65,3 +65,16 @@ func TestNewQueryBuilderUpdate(t *testing.T) {
 func TestInterfaceCompliance(t *testing.T) {
 	var _ dal.DBInterface = (*PostgresDB)(nil)
 }
+
+func TestExpressionOverrides(t *testing.T) {
+	d := NewDialect()
+	if got := d.ConcatExpr("a", "b"); got != "CONCAT(a, b)" {
+		t.Errorf("ConcatExpr = %q, want CONCAT(a, b)", got)
+	}
+	if got := d.StringAggExpr("name", "', '"); got != "STRING_AGG(name, ', ')" {
+		t.Errorf("StringAggExpr = %q, want STRING_AGG(name, ', ')", got)
+	}
+	if got := d.RandExpr(); got != "RANDOM()" {
+		t.Errorf("RandExpr = %q, want RANDOM()", got)
+	}
+}
