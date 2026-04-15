@@ -452,11 +452,10 @@ func (d *BaseDialect) BuildSelect(q *SelectQuery) (string, []interface{}, error)
 	}
 
 	if len(q.having) > 0 {
-		havingStr, newIdx, newArgs, err := d.buildClauses(q.having, paramIdx, args)
+		havingStr, _, newArgs, err := d.buildClauses(q.having, paramIdx, args)
 		if err != nil {
 			return "", nil, err
 		}
-		paramIdx = newIdx
 		args = newArgs
 		b.WriteString(" HAVING ")
 		b.WriteString(havingStr)
@@ -583,11 +582,10 @@ func (d *BaseDialect) BuildUpdate(q *UpdateQuery) (string, []interface{}, error)
 	paramIdx := len(q.keys) + 1
 
 	if len(q.wheres) > 0 {
-		whereStr, newIdx, newArgs, err := d.buildClauses(q.wheres, paramIdx, args)
+		whereStr, _, newArgs, err := d.buildClauses(q.wheres, paramIdx, args)
 		if err != nil {
 			return "", nil, err
 		}
-		paramIdx = newIdx
 		args = newArgs
 		b.WriteString(" WHERE ")
 		b.WriteString(whereStr)
@@ -619,11 +617,10 @@ func (d *BaseDialect) BuildDelete(q *DeleteQuery) (string, []interface{}, error)
 	paramIdx := 1
 
 	if len(q.wheres) > 0 {
-		whereStr, newIdx, newArgs, err := d.buildClauses(q.wheres, paramIdx, args)
+		whereStr, _, newArgs, err := d.buildClauses(q.wheres, paramIdx, args)
 		if err != nil {
 			return "", nil, err
 		}
-		paramIdx = newIdx
 		args = newArgs
 		b.WriteString(" WHERE ")
 		b.WriteString(whereStr)
@@ -648,11 +645,11 @@ func SafeIdentifier(name string) error {
 			continue
 		}
 		if i == 0 {
-			if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_') {
+			if (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') && ch != '_' {
 				return fmt.Errorf("dal: invalid identifier %q", name)
 			}
 		} else {
-			if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_') {
+			if (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') && (ch < '0' || ch > '9') && ch != '_' {
 				return fmt.Errorf("dal: invalid identifier %q", name)
 			}
 		}

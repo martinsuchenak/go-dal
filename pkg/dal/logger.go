@@ -145,7 +145,7 @@ func (b *BaseDB) WithTx(ctx context.Context, opts *sql.TxOptions, fn func(*Tx) e
 	committed := false
 	defer func() {
 		if !committed {
-			tx.Rollback()
+			_ = tx.Rollback()
 		}
 	}()
 	if err := fn(tx); err != nil {

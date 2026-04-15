@@ -30,12 +30,12 @@ func TestInClause(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var names []string
 		for rows.Next() {
 			var name string
-			rows.Scan(&name)
+			_ = rows.Scan(&name)
 			names = append(names, name)
 		}
 
@@ -74,12 +74,12 @@ func TestInClauseWithOtherWhere(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var names []string
 		for rows.Next() {
 			var name string
-			rows.Scan(&name)
+			_ = rows.Scan(&name)
 			names = append(names, name)
 		}
 
@@ -93,7 +93,7 @@ func TestInClauseDelete(t *testing.T) {
 	runForEachDBWithSeed(t, func(t *testing.T, td *testDB) {
 		ctx := context.Background()
 
-		td.dalDB.Exec(ctx, "DELETE FROM orders WHERE user_id IN (SELECT id FROM users WHERE name IN ('Alice', 'Bob', 'Charlie'))")
+		_, _ = td.dalDB.Exec(ctx, "DELETE FROM orders WHERE user_id IN (SELECT id FROM users WHERE name IN ('Alice', 'Bob', 'Charlie'))")
 
 		qb := td.builder()
 		inVals, err := dal.In("Alice", "Bob")

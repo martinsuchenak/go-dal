@@ -44,7 +44,7 @@ func connectWithRetry(t *testing.T, driver, dsn string, maxWait time.Duration) *
 		if err == nil {
 			return db
 		}
-		db.Close()
+		_ = db.Close()
 		if time.Now().After(deadline) {
 			t.Fatalf("ping failed after %v: %v", maxWait, err)
 		}
@@ -97,8 +97,8 @@ func setupAllDBs(t *testing.T) []*testDB {
 
 	// MSSQL - connect to master first, create godal_test, then reconnect
 	mssqlMaster := connectWithRetry(t, "sqlserver", "sqlserver://sa:TestPass123!@localhost:11433?encrypt=disable", 15*time.Second)
-	mssqlMaster.Exec("IF DB_ID('godal_test') IS NULL CREATE DATABASE godal_test")
-	mssqlMaster.Close()
+	_, _ = mssqlMaster.Exec("IF DB_ID('godal_test') IS NULL CREATE DATABASE godal_test")
+	_ = mssqlMaster.Close()
 
 	mssqlDB := connectWithRetry(t, "sqlserver", "sqlserver://sa:TestPass123!@localhost:11433?database=godal_test&encrypt=disable", 10*time.Second)
 	mssqlDalDB := mssql.NewMSSQLDB(mssqlDB, nil)
@@ -120,22 +120,22 @@ func createSchema(t *testing.T, td *testDB) {
 
 	switch td.name {
 	case "sqlite":
-		td.db.Exec("DROP TABLE IF EXISTS order_items")
-		td.db.Exec("DROP TABLE IF EXISTS orders")
-		td.db.Exec("DROP TABLE IF EXISTS products")
-		td.db.Exec("DROP TABLE IF EXISTS users")
-		td.dalDB.Exec(ctx, `CREATE TABLE users (
+		_, _ = td.db.Exec("DROP TABLE IF EXISTS order_items")
+		_, _ = td.db.Exec("DROP TABLE IF EXISTS orders")
+		_, _ = td.db.Exec("DROP TABLE IF EXISTS products")
+		_, _ = td.db.Exec("DROP TABLE IF EXISTS users")
+		_, _ = td.dalDB.Exec(ctx, `CREATE TABLE users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT NOT NULL,
 			email TEXT NOT NULL,
 			active INTEGER NOT NULL DEFAULT 1
 		)`)
-		td.dalDB.Exec(ctx, `CREATE TABLE products (
+		_, _ = td.dalDB.Exec(ctx, `CREATE TABLE products (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT NOT NULL,
 			price REAL NOT NULL
 		)`)
-		td.dalDB.Exec(ctx, `CREATE TABLE orders (
+		_, _ = td.dalDB.Exec(ctx, `CREATE TABLE orders (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id INTEGER NOT NULL,
 			product_id INTEGER NOT NULL,
@@ -145,7 +145,7 @@ func createSchema(t *testing.T, td *testDB) {
 			FOREIGN KEY (user_id) REFERENCES users(id),
 			FOREIGN KEY (product_id) REFERENCES products(id)
 		)`)
-		td.dalDB.Exec(ctx, `CREATE TABLE order_items (
+		_, _ = td.dalDB.Exec(ctx, `CREATE TABLE order_items (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			order_id INTEGER NOT NULL,
 			product_id INTEGER NOT NULL,
@@ -155,22 +155,22 @@ func createSchema(t *testing.T, td *testDB) {
 		)`)
 
 	case "mysql":
-		td.db.Exec("DROP TABLE IF EXISTS order_items")
-		td.db.Exec("DROP TABLE IF EXISTS orders")
-		td.db.Exec("DROP TABLE IF EXISTS products")
-		td.db.Exec("DROP TABLE IF EXISTS users")
-		td.dalDB.Exec(ctx, `CREATE TABLE users (
+		_, _ = td.db.Exec("DROP TABLE IF EXISTS order_items")
+		_, _ = td.db.Exec("DROP TABLE IF EXISTS orders")
+		_, _ = td.db.Exec("DROP TABLE IF EXISTS products")
+		_, _ = td.db.Exec("DROP TABLE IF EXISTS users")
+		_, _ = td.dalDB.Exec(ctx, `CREATE TABLE users (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			name VARCHAR(255) NOT NULL,
 			email VARCHAR(255) NOT NULL,
 			active BOOLEAN NOT NULL DEFAULT TRUE
 		) ENGINE=InnoDB`)
-		td.dalDB.Exec(ctx, `CREATE TABLE products (
+		_, _ = td.dalDB.Exec(ctx, `CREATE TABLE products (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			name VARCHAR(255) NOT NULL,
 			price DECIMAL(10,2) NOT NULL
 		) ENGINE=InnoDB`)
-		td.dalDB.Exec(ctx, `CREATE TABLE orders (
+		_, _ = td.dalDB.Exec(ctx, `CREATE TABLE orders (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			user_id INT NOT NULL,
 			product_id INT NOT NULL,
@@ -180,7 +180,7 @@ func createSchema(t *testing.T, td *testDB) {
 			FOREIGN KEY (user_id) REFERENCES users(id),
 			FOREIGN KEY (product_id) REFERENCES products(id)
 		) ENGINE=InnoDB`)
-		td.dalDB.Exec(ctx, `CREATE TABLE order_items (
+		_, _ = td.dalDB.Exec(ctx, `CREATE TABLE order_items (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			order_id INT NOT NULL,
 			product_id INT NOT NULL,
@@ -190,19 +190,19 @@ func createSchema(t *testing.T, td *testDB) {
 		) ENGINE=InnoDB`)
 
 	case "postgres":
-		td.db.Exec("DROP TABLE IF EXISTS order_items; DROP TABLE IF EXISTS orders; DROP TABLE IF EXISTS products; DROP TABLE IF EXISTS users")
-		td.dalDB.Exec(ctx, `CREATE TABLE users (
+		_, _ = td.db.Exec("DROP TABLE IF EXISTS order_items; DROP TABLE IF EXISTS orders; DROP TABLE IF EXISTS products; DROP TABLE IF EXISTS users")
+		_, _ = td.dalDB.Exec(ctx, `CREATE TABLE users (
 			id SERIAL PRIMARY KEY,
 			name VARCHAR(255) NOT NULL,
 			email VARCHAR(255) NOT NULL,
 			active BOOLEAN NOT NULL DEFAULT TRUE
 		)`)
-		td.dalDB.Exec(ctx, `CREATE TABLE products (
+		_, _ = td.dalDB.Exec(ctx, `CREATE TABLE products (
 			id SERIAL PRIMARY KEY,
 			name VARCHAR(255) NOT NULL,
 			price DECIMAL(10,2) NOT NULL
 		)`)
-		td.dalDB.Exec(ctx, `CREATE TABLE orders (
+		_, _ = td.dalDB.Exec(ctx, `CREATE TABLE orders (
 			id SERIAL PRIMARY KEY,
 			user_id INT NOT NULL REFERENCES users(id),
 			product_id INT NOT NULL REFERENCES products(id),
@@ -210,7 +210,7 @@ func createSchema(t *testing.T, td *testDB) {
 			total_price DECIMAL(10,2) NOT NULL,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`)
-		td.dalDB.Exec(ctx, `CREATE TABLE order_items (
+		_, _ = td.dalDB.Exec(ctx, `CREATE TABLE order_items (
 			id SERIAL PRIMARY KEY,
 			order_id INT NOT NULL REFERENCES orders(id),
 			product_id INT NOT NULL REFERENCES products(id),
@@ -218,22 +218,22 @@ func createSchema(t *testing.T, td *testDB) {
 		)`)
 
 	case "mssql":
-		td.db.Exec("IF OBJECT_ID('order_items', 'U') IS NOT NULL DROP TABLE order_items")
-		td.db.Exec("IF OBJECT_ID('orders', 'U') IS NOT NULL DROP TABLE orders")
-		td.db.Exec("IF OBJECT_ID('products', 'U') IS NOT NULL DROP TABLE products")
-		td.db.Exec("IF OBJECT_ID('users', 'U') IS NOT NULL DROP TABLE users")
-		td.dalDB.Exec(ctx, `CREATE TABLE users (
+		_, _ = td.db.Exec("IF OBJECT_ID('order_items', 'U') IS NOT NULL DROP TABLE order_items")
+		_, _ = td.db.Exec("IF OBJECT_ID('orders', 'U') IS NOT NULL DROP TABLE orders")
+		_, _ = td.db.Exec("IF OBJECT_ID('products', 'U') IS NOT NULL DROP TABLE products")
+		_, _ = td.db.Exec("IF OBJECT_ID('users', 'U') IS NOT NULL DROP TABLE users")
+		_, _ = td.dalDB.Exec(ctx, `CREATE TABLE users (
 			id INT IDENTITY(1,1) PRIMARY KEY,
 			name NVARCHAR(255) NOT NULL,
 			email NVARCHAR(255) NOT NULL,
 			active BIT NOT NULL DEFAULT 1
 		)`)
-		td.dalDB.Exec(ctx, `CREATE TABLE products (
+		_, _ = td.dalDB.Exec(ctx, `CREATE TABLE products (
 			id INT IDENTITY(1,1) PRIMARY KEY,
 			name NVARCHAR(255) NOT NULL,
 			price DECIMAL(10,2) NOT NULL
 		)`)
-		td.dalDB.Exec(ctx, `CREATE TABLE orders (
+		_, _ = td.dalDB.Exec(ctx, `CREATE TABLE orders (
 			id INT IDENTITY(1,1) PRIMARY KEY,
 			user_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
 			product_id INT NOT NULL FOREIGN KEY REFERENCES products(id),
@@ -241,7 +241,7 @@ func createSchema(t *testing.T, td *testDB) {
 			total_price DECIMAL(10,2) NOT NULL,
 			created_at DATETIME DEFAULT GETDATE()
 		)`)
-		td.dalDB.Exec(ctx, `CREATE TABLE order_items (
+		_, _ = td.dalDB.Exec(ctx, `CREATE TABLE order_items (
 			id INT IDENTITY(1,1) PRIMARY KEY,
 			order_id INT NOT NULL FOREIGN KEY REFERENCES orders(id),
 			product_id INT NOT NULL FOREIGN KEY REFERENCES products(id),
@@ -262,20 +262,20 @@ func seedData(t *testing.T, td *testDB) {
 	}
 
 	// Users
-	td.dalDB.Exec(ctx, fmt.Sprintf("INSERT INTO users (name, email, active) VALUES ('Alice', 'alice@example.com', %s)", boolTrue))
-	td.dalDB.Exec(ctx, fmt.Sprintf("INSERT INTO users (name, email, active) VALUES ('Bob', 'bob@example.com', %s)", boolTrue))
-	td.dalDB.Exec(ctx, fmt.Sprintf("INSERT INTO users (name, email, active) VALUES ('Charlie', 'charlie@example.com', %s)", boolFalse))
+	_, _ = td.dalDB.Exec(ctx, fmt.Sprintf("INSERT INTO users (name, email, active) VALUES ('Alice', 'alice@example.com', %s)", boolTrue))
+	_, _ = td.dalDB.Exec(ctx, fmt.Sprintf("INSERT INTO users (name, email, active) VALUES ('Bob', 'bob@example.com', %s)", boolTrue))
+	_, _ = td.dalDB.Exec(ctx, fmt.Sprintf("INSERT INTO users (name, email, active) VALUES ('Charlie', 'charlie@example.com', %s)", boolFalse))
 
 	// Products
-	td.dalDB.Exec(ctx, "INSERT INTO products (name, price) VALUES ('Widget', 9.99)")
-	td.dalDB.Exec(ctx, "INSERT INTO products (name, price) VALUES ('Gadget', 24.99)")
-	td.dalDB.Exec(ctx, "INSERT INTO products (name, price) VALUES ('Doohickey', 4.99)")
+	_, _ = td.dalDB.Exec(ctx, "INSERT INTO products (name, price) VALUES ('Widget', 9.99)")
+	_, _ = td.dalDB.Exec(ctx, "INSERT INTO products (name, price) VALUES ('Gadget', 24.99)")
+	_, _ = td.dalDB.Exec(ctx, "INSERT INTO products (name, price) VALUES ('Doohickey', 4.99)")
 
 	// Orders
-	td.dalDB.Exec(ctx, "INSERT INTO orders (user_id, product_id, quantity, total_price) VALUES (1, 1, 2, 19.98)")
-	td.dalDB.Exec(ctx, "INSERT INTO orders (user_id, product_id, quantity, total_price) VALUES (1, 2, 1, 24.99)")
-	td.dalDB.Exec(ctx, "INSERT INTO orders (user_id, product_id, quantity, total_price) VALUES (2, 2, 3, 74.97)")
-	td.dalDB.Exec(ctx, "INSERT INTO orders (user_id, product_id, quantity, total_price) VALUES (2, 3, 5, 24.95)")
+	_, _ = td.dalDB.Exec(ctx, "INSERT INTO orders (user_id, product_id, quantity, total_price) VALUES (1, 1, 2, 19.98)")
+	_, _ = td.dalDB.Exec(ctx, "INSERT INTO orders (user_id, product_id, quantity, total_price) VALUES (1, 2, 1, 24.99)")
+	_, _ = td.dalDB.Exec(ctx, "INSERT INTO orders (user_id, product_id, quantity, total_price) VALUES (2, 2, 3, 74.97)")
+	_, _ = td.dalDB.Exec(ctx, "INSERT INTO orders (user_id, product_id, quantity, total_price) VALUES (2, 3, 5, 24.95)")
 }
 
 func runForEachDB(t *testing.T, fn func(t *testing.T, td *testDB)) {
@@ -284,7 +284,7 @@ func runForEachDB(t *testing.T, fn func(t *testing.T, td *testDB)) {
 	for _, td := range dbs {
 		t.Run(td.name, func(t *testing.T) {
 			createSchema(t, td)
-			defer td.dalDB.Close()
+			defer func() { _ = td.dalDB.Close() }()
 			fn(t, td)
 		})
 	}
@@ -297,7 +297,7 @@ func runForEachDBWithSeed(t *testing.T, fn func(t *testing.T, td *testDB)) {
 		t.Run(td.name, func(t *testing.T) {
 			createSchema(t, td)
 			seedData(t, td)
-			defer td.dalDB.Close()
+			defer func() { _ = td.dalDB.Close() }()
 			fn(t, td)
 		})
 	}

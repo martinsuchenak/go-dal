@@ -71,7 +71,7 @@ func TestSelect(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var names []string
 		for rows.Next() {
@@ -142,12 +142,9 @@ func TestDelete(t *testing.T) {
 		ctx := context.Background()
 
 		// Delete Charlie's orders first (FK constraint)
-		qb := td.builder()
-		rawSQL := "DELETE FROM orders WHERE user_id = (SELECT id FROM users WHERE name = 'Charlie')"
-		td.dalDB.Exec(ctx, rawSQL)
+		_, _ = td.dalDB.Exec(ctx, "DELETE FROM orders WHERE user_id = (SELECT id FROM users WHERE name = 'Charlie')")
 
-		qb = td.builder()
-		query, args, err := qb.Delete("users").
+		query, args, err := td.builder().Delete("users").
 			Where("name = ?", "Charlie").
 			Build()
 		if err != nil {
@@ -164,8 +161,7 @@ func TestDelete(t *testing.T) {
 			t.Errorf("expected 1 row affected, got %d", rows)
 		}
 
-		qb = td.builder()
-		sq, sa, err := qb.Select("COUNT(*)").
+		sq, sa, err := td.builder().Select("COUNT(*)").
 			From("users").
 			Build()
 		if err != nil {
@@ -173,7 +169,7 @@ func TestDelete(t *testing.T) {
 		}
 
 		var count int
-		td.dalDB.QueryRow(ctx, sq, sa...).Scan(&count)
+		_ = td.dalDB.QueryRow(ctx, sq, sa...).Scan(&count)
 		if count != 2 {
 			t.Errorf("expected 2 users after delete, got %d", count)
 		}
@@ -199,12 +195,12 @@ func TestSelectWithLimitOffset(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var names []string
 		for rows.Next() {
 			var name string
-			rows.Scan(&name)
+			_ = rows.Scan(&name)
 			names = append(names, name)
 		}
 

@@ -23,12 +23,12 @@ func TestSelectDistinct(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var values []int
 		for rows.Next() {
 			var active interface{}
-			rows.Scan(&active)
+			_ = rows.Scan(&active)
 			values = append(values, 1)
 		}
 
@@ -55,12 +55,12 @@ func TestSelectDistinctCount(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var count int
 		for rows.Next() {
 			var userID int
-			rows.Scan(&userID)
+			_ = rows.Scan(&userID)
 			count++
 		}
 
@@ -87,7 +87,7 @@ func TestSelectAll(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		count := 0
 		for rows.Next() {

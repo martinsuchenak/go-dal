@@ -23,12 +23,12 @@ func TestLike(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var names []string
 		for rows.Next() {
 			var name string
-			rows.Scan(&name)
+			_ = rows.Scan(&name)
 			names = append(names, name)
 		}
 
@@ -55,12 +55,12 @@ func TestLikeStartsWith(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var names []string
 		for rows.Next() {
 			var name string
-			rows.Scan(&name)
+			_ = rows.Scan(&name)
 			names = append(names, name)
 		}
 
@@ -90,12 +90,12 @@ func TestLikeContains(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var names []string
 		for rows.Next() {
 			var name string
-			rows.Scan(&name)
+			_ = rows.Scan(&name)
 			names = append(names, name)
 		}
 
@@ -126,12 +126,12 @@ func TestLikeCombinedWithInClause(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var names []string
 		for rows.Next() {
 			var name string
-			rows.Scan(&name)
+			_ = rows.Scan(&name)
 			names = append(names, name)
 		}
 

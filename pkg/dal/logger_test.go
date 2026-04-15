@@ -67,10 +67,10 @@ func setupTestDB(t *testing.T) (*sql.DB, func()) {
 	}
 	_, err = db.Exec("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		t.Fatal(err)
 	}
-	return db, func() { db.Close() }
+	return db, func() { _ = db.Close() }
 }
 
 func TestBaseDBExecLogs(t *testing.T) {
@@ -109,7 +109,7 @@ func TestBaseDBQueryLogs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rows.Close()
+	_ = rows.Close()
 
 	if e := log.find("debug", "query"); e == nil {
 		t.Error("expected debug 'query' log entry")
@@ -150,7 +150,7 @@ func TestBaseDBBeginTxLogs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.Rollback()
+	_ = tx.Rollback()
 
 	if e := log.find("debug", "begin_tx"); e == nil {
 		t.Error("expected debug 'begin_tx' log entry")
@@ -164,8 +164,8 @@ func TestBaseDBCloseLogs(t *testing.T) {
 	log := &mockLogger{}
 	bdb := NewBaseDB(db, log)
 
-	bdb.Close()
-	cleanup = func() {}
+	_ = bdb.Close()
+	_ = cleanup
 
 	if e := log.find("debug", "close"); e == nil {
 		t.Error("expected debug 'close' log entry")
@@ -201,7 +201,7 @@ func TestBaseDBQueryErrorLogs(t *testing.T) {
 
 	rows, err := bdb.Query(context.Background(), "SELECT * FROM nonexistent")
 	if err == nil {
-		rows.Close()
+		_ = rows.Close()
 		t.Fatal("expected error from invalid SQL")
 	}
 

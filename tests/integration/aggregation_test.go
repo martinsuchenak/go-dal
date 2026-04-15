@@ -87,7 +87,7 @@ func TestGroupBy(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		type row struct {
 			name       string
@@ -138,7 +138,7 @@ func TestGroupByWithHaving(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		type row struct {
 			name       string
@@ -224,7 +224,7 @@ func TestGroupByMultipleColumns(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		type row struct {
 			user     string

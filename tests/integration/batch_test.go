@@ -37,7 +37,7 @@ func TestBatchInsert(t *testing.T) {
 		}
 
 		var count int
-		td.dalDB.QueryRow(ctx, sq, sa...).Scan(&count)
+		_ = td.dalDB.QueryRow(ctx, sq, sa...).Scan(&count)
 		if count != 3 {
 			t.Errorf("expected 3 users, got %d", count)
 		}
@@ -76,12 +76,12 @@ func TestBatchInsertThenSelect(t *testing.T) {
 		if err != nil {
 			t.Fatalf("select failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var names []string
 		for rows.Next() {
 			var name string
-			rows.Scan(&name)
+			_ = rows.Scan(&name)
 			names = append(names, name)
 		}
 

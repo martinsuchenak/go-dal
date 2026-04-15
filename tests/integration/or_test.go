@@ -24,12 +24,12 @@ func TestOrWhere(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var names []string
 		for rows.Next() {
 			var name string
-			rows.Scan(&name)
+			_ = rows.Scan(&name)
 			names = append(names, name)
 		}
 
@@ -65,12 +65,12 @@ func TestOrWhereWithAnd(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var names []string
 		for rows.Next() {
 			var name string
-			rows.Scan(&name)
+			_ = rows.Scan(&name)
 			names = append(names, name)
 		}
 
@@ -114,7 +114,7 @@ func TestOrWhereUpdate(t *testing.T) {
 		}
 
 		var count int
-		td.dalDB.QueryRow(ctx, sq, sa...).Scan(&count)
+		_ = td.dalDB.QueryRow(ctx, sq, sa...).Scan(&count)
 		if count != 2 {
 			t.Errorf("expected 2 users with shared email, got %d", count)
 		}

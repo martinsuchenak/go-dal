@@ -25,7 +25,7 @@ func TestInnerJoin(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		type row struct {
 			userName    string
@@ -82,7 +82,7 @@ func TestLeftJoin(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		type row struct {
 			name       string
@@ -132,7 +132,7 @@ func TestJoinWithWhere(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var count int
 		for rows.Next() {
@@ -173,7 +173,7 @@ func TestThreeTableJoin(t *testing.T) {
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var count int
 		for rows.Next() {

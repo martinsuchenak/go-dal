@@ -83,7 +83,7 @@ func TestTransactionRollback(t *testing.T) {
 			t.Fatal(err)
 		}
 		var count int
-		td.dalDB.QueryRow(ctx, sq, sa...).Scan(&count)
+		_ = td.dalDB.QueryRow(ctx, sq, sa...).Scan(&count)
 		if count != 0 {
 			t.Errorf("expected 0 rows after rollback, got %d", count)
 		}
