@@ -12,6 +12,11 @@ func NewQueryBuilder(dialect Dialect) *QueryBuilder {
 	return &QueryBuilder{dialect: dialect}
 }
 
+// Dialect returns the dialect used by this query builder.
+func (qb *QueryBuilder) Dialect() Dialect {
+	return qb.dialect
+}
+
 // Select starts a SELECT query with the given columns.
 func (qb *QueryBuilder) Select(columns ...string) *SelectQuery {
 	return &SelectQuery{columns: columns, dialect: qb.dialect}

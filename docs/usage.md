@@ -550,14 +550,58 @@ if err := dal.SafeIdentifier(userInput); err != nil {
 
 ---
 
-## Portability Notes
+## Portability Helpers
 
-The query builder handles mechanical differences (placeholders, quoting, LIMIT syntax) but does not abstract SQL expressions. Be aware of:
+SQL expression syntax varies across databases. Expression helpers are methods on the `Dialect` interface and are exposed through `QueryBuilder` convenience wrappers — no driver-specific imports needed:
 
-| Expression | MySQL | PostgreSQL | SQLite | MSSQL |
-|------------|-------|------------|--------|-------|
-| String concat | `CONCAT(a, b)` | `a \|\| b` | `a \|\| b` | `a + b` |
-| Current timestamp | `NOW()` | `NOW()` | `datetime('now')` | `GETDATE()` |
-| Boolean literal | `TRUE`/`FALSE` | `TRUE`/`FALSE` | `1`/`0` | `1`/`0` |
+```go
+qb := mysql.NewQueryBuilder()
 
-For cross-database code, stick to standard SQL expressions or use the `Dialect` interface to add expression helpers.
+qb.Select(qb.ConcatExpr("first_name", "' '", "last_name"))
+// MySQL/PostgreSQL/SQLite: CONCAT(first_name, ' ', last_name)
+// MSSQL:                   first_name + ' ' + last_name
+
+qb.Select(qb.LengthExpr("name"))
+// MySQL/PostgreSQL/SQLite: LENGTH(name)
+// MSSQL:                   LEN(name)
+
+qb.Select(qb.CurrentTimestamp())
+// MySQL/PostgreSQL: NOW()
+// SQLite:           datetime('now')
+// MSSQL:            GETDATE()
+
+qb.Where("active = " + qb.BoolLiteral(true))
+// MySQL/PostgreSQL: active = TRUE
+// SQLite/MSSQL:     active = 1
+
+qb.Select(qb.StringAggExpr("name", "', '")).GroupBy("team")
+// MySQL:      GROUP_CONCAT(name SEPARATOR ', ')
+// SQLite:     GROUP_CONCAT(name, ', ')
+// PostgreSQL: STRING_AGG(name, ', ')
+// MSSQL:      STRING_AGG(name, ', ')
+
+qb.Select(qb.RandExpr())
+// MySQL/MSSQL:      RAND()
+// PostgreSQL/SQLite: RANDOM()
+```
+
+Each query builder is pre-configured with the correct dialect, so `qb.XxxExpr()` always generates the right SQL for your database.
+
+### Still Portable (No Helper Needed)
+
+These expressions work identically across all four databases:
+
+- `COALESCE(a, b)`
+- `UPPER(s)`, `LOWER(s)`
+- `SUBSTRING(s, start, length)`
+- `CAST(x AS type)`
+- `COUNT(*)`, `SUM(x)`, `AVG(x)`, `MIN(x)`, `MAX(x)`
+
+### Still Database-Specific
+
+These vary too much for simple helpers and require database-specific SQL:
+
+- Date/time arithmetic (`INTERVAL`, `DATEADD`, etc.)
+- JSON operations
+- Full-text search
+- Window functions (syntax varies in edge cases)

@@ -1,14 +1,36 @@
 package sqlite
 
-import "github.com/martinsuchenak/go-dal/pkg/dal"
+import (
+	"fmt"
 
-// NewDialect returns a Dialect configured for SQLite.
+	"github.com/martinsuchenak/go-dal/pkg/dal"
+)
+
+type sqliteDialect struct {
+	*dal.BaseDialect
+}
+
+func (d *sqliteDialect) CurrentTimestamp() string { return "datetime('now')" }
+
+func (d *sqliteDialect) BoolLiteral(v bool) string {
+	if v {
+		return "1"
+	}
+	return "0"
+}
+
+func (d *sqliteDialect) StringAggExpr(col, sep string) string {
+	return fmt.Sprintf("GROUP_CONCAT(%s, %s)", col, sep)
+}
+
+func (d *sqliteDialect) RandExpr() string { return "RANDOM()" }
+
 func NewDialect() dal.Dialect {
-	d := &dal.BaseDialect{
+	b := &dal.BaseDialect{
 		Placeholder: dal.QuestionMarkPlaceholder,
 		AppendLimit: dal.LimitOffset,
 		QuoteStyle:  dal.DoubleQuoteQuoting,
 	}
-	d.AppendReturning = d.WriteReturning
-	return d
+	b.AppendReturning = b.WriteReturning
+	return &sqliteDialect{BaseDialect: b}
 }

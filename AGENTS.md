@@ -135,9 +135,10 @@ See [docs/contributing.md](docs/contributing.md) for the full guide.
 | `pkg/dal/types.go` | New query struct fields, interface changes, error vars |
 | `pkg/dal/query_builder.go` | New fluent methods, In() helper, WhereGroup |
 | `pkg/dal/dialect.go` | SQL generation, quoting, placeholder translation, SafeIdentifier |
+| `pkg/dal/expressions.go` | Portable SQL expression helpers (ConcatExpr, LengthExpr, etc.) — methods on BaseDialect + QueryBuilder wrappers |
 | `pkg/dal/logger.go` | Logging, Tx wrapper, BaseDB methods, DBExecutor, WithTx |
 | `pkg/*/yourdb.go` | Driver constructor, NewQueryBuilder |
-| `pkg/*/dialect.go` | Driver-specific dialect config (function fields) |
+| `pkg/*/dialect.go` | Driver-specific dialect config (function fields) + expression overrides via embedded dialect struct |
 | `tests/integration/helpers.go` | Database connection setup, schema, seed data |
 | `tests/integration/*.go` | Integration test cases |
 | `docker-compose.test.yml` | Test database containers |

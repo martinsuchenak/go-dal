@@ -59,6 +59,12 @@ type Dialect interface {
 	BuildDelete(q *DeleteQuery) (string, []interface{}, error)
 	QuoteIdentifier(name string) string
 	SupportsReturning() bool
+	ConcatExpr(parts ...string) string
+	LengthExpr(col string) string
+	CurrentTimestamp() string
+	BoolLiteral(v bool) string
+	StringAggExpr(col, sep string) string
+	RandExpr() string
 }
 
 // BaseDialect provides a common SQL generation implementation that covers

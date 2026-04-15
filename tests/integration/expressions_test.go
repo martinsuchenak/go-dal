@@ -10,13 +10,7 @@ func TestConcat(t *testing.T) {
 		ctx := context.Background()
 		qb := td.builder()
 
-		var concatExpr string
-		switch td.name {
-		case "mssql":
-			concatExpr = "name + ' <' + email + '>'"
-		default:
-			concatExpr = "CONCAT(name, ' <', email, '>')"
-		}
+		concatExpr := qb.ConcatExpr("name", "' <'", "email", "'>'")
 
 		query, args, err := qb.Select(concatExpr).
 			From("users").
@@ -42,15 +36,7 @@ func TestStringLength(t *testing.T) {
 		ctx := context.Background()
 		qb := td.builder()
 
-		var lengthExpr string
-		switch td.name {
-		case "mssql":
-			lengthExpr = "LEN(name)"
-		default:
-			lengthExpr = "LENGTH(name)"
-		}
-
-		query, args, err := qb.Select(lengthExpr).
+		query, args, err := qb.Select(qb.LengthExpr("name")).
 			From("users").
 			Where("name = ?", "Bob").
 			Build()
@@ -116,6 +102,92 @@ func TestUpperLower(t *testing.T) {
 		}
 		if lower != "alice@example.com" {
 			t.Errorf("got lower %q, want 'alice@example.com'", lower)
+		}
+	})
+}
+
+func TestCurrentTimestamp(t *testing.T) {
+	runForEachDBWithSeed(t, func(t *testing.T, td *testDB) {
+		ctx := context.Background()
+		qb := td.builder()
+
+		query, args, err := qb.Select(qb.CurrentTimestamp()).
+			From("users").
+			Where("name = ?", "Alice").
+			Build()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var result interface{}
+		err = td.dalDB.QueryRow(ctx, query, args...).Scan(&result)
+		if err != nil {
+			t.Fatalf("current timestamp query failed: %v", err)
+		}
+		if result == nil {
+			t.Error("got nil timestamp")
+		}
+	})
+}
+
+func TestBoolLiteral(t *testing.T) {
+	runForEachDBWithSeed(t, func(t *testing.T, td *testDB) {
+		ctx := context.Background()
+
+		raw := "SELECT " + td.dialect.BoolLiteral(true)
+		var result interface{}
+		err := td.dalDB.QueryRow(ctx, raw).Scan(&result)
+		if err != nil {
+			t.Fatalf("bool literal query failed: %v", err)
+		}
+	})
+}
+
+func TestStringAgg(t *testing.T) {
+	runForEachDBWithSeed(t, func(t *testing.T, td *testDB) {
+		ctx := context.Background()
+		qb := td.builder()
+
+		aggExpr := qb.StringAggExpr("name", "', '")
+
+		query, args, err := qb.Select(aggExpr).
+			From("users").
+			Build()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var result *string
+		err = td.dalDB.QueryRow(ctx, query, args...).Scan(&result)
+		if err != nil {
+			t.Fatalf("string agg query failed: %v", err)
+		}
+		if result == nil {
+			t.Error("got nil string agg result")
+		}
+	})
+}
+
+func TestRandExpr(t *testing.T) {
+	runForEachDBWithSeed(t, func(t *testing.T, td *testDB) {
+		ctx := context.Background()
+		qb := td.builder()
+
+		query, args, err := qb.Select(qb.RandExpr()).
+			From("users").
+			Where("name = ?", "Alice").
+			Build()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var result interface{}
+		err = td.dalDB.QueryRow(ctx, query, args...).Scan(&result)
+		if err != nil {
+			t.Fatalf("rand query failed: %v", err)
+		}
+		if result == nil {
+			t.Error("got nil random result")
 		}
 	})
 }

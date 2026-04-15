@@ -86,7 +86,20 @@ GO-DAL is a lightweight, interface-driven database abstraction layer for Go that
 - [x] Integration tests across SQLite, MySQL, PostgreSQL, MSSQL (CRUD, JOINs, aggregation, transactions)
 - [x] Runnable Go examples
 
-## Phase 8: Documentation
+## Phase 8: Portability Expression Helpers
+- [x] 6 portable expression methods on `Dialect` interface: ConcatExpr, LengthExpr, CurrentTimestamp, BoolLiteral, StringAggExpr, RandExpr
+- [x] `BaseDialect` default implementations in `pkg/dal/expressions.go`
+- [x] `QueryBuilder` convenience wrappers (`qb.ConcatExpr()`, etc.) — no driver-specific imports needed
+- [x] MSSQL overrides all 6 via `mssqlDialect` struct (embeds `*dal.BaseDialect`)
+- [x] PostgreSQL overrides `StringAggExpr`, `RandExpr` via `postgresDialect`
+- [x] SQLite overrides `CurrentTimestamp`, `BoolLiteral`, `StringAggExpr`, `RandExpr` via `sqliteDialect`
+- [x] MySQL uses plain `*dal.BaseDialect` (all defaults work)
+- [x] Unit tests in `pkg/dal/expressions_test.go`
+- [x] Integration tests in `tests/integration/expressions_test.go`
+- [x] Removed stale driver-level expression files (`pkg/*/expressions.go`, `pkg/*/expressions_test.go`)
+- [x] Updated documentation (`docs/usage.md`, `AGENTS.md`)
+
+## Phase 9: Documentation
 - [x] README with installation, quick start, query builder, logging, dialect, portability notes
 - [x] API reference in `docs/usage.md`
 - [x] Contributing guide in `docs/contributing.md`

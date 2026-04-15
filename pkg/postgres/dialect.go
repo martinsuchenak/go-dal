@@ -1,14 +1,27 @@
 package postgres
 
-import "github.com/martinsuchenak/go-dal/pkg/dal"
+import (
+	"fmt"
 
-// NewDialect returns a Dialect configured for PostgreSQL.
+	"github.com/martinsuchenak/go-dal/pkg/dal"
+)
+
+type postgresDialect struct {
+	*dal.BaseDialect
+}
+
+func (d *postgresDialect) StringAggExpr(col, sep string) string {
+	return fmt.Sprintf("STRING_AGG(%s, %s)", col, sep)
+}
+
+func (d *postgresDialect) RandExpr() string { return "RANDOM()" }
+
 func NewDialect() dal.Dialect {
-	d := &dal.BaseDialect{
+	b := &dal.BaseDialect{
 		Placeholder: dal.DollarPlaceholder,
 		AppendLimit: dal.LimitOffset,
 		QuoteStyle:  dal.DoubleQuoteQuoting,
 	}
-	d.AppendReturning = d.WriteReturning
-	return d
+	b.AppendReturning = b.WriteReturning
+	return &postgresDialect{BaseDialect: b}
 }

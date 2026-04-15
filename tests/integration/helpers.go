@@ -24,6 +24,7 @@ type testDB struct {
 	db      *sql.DB
 	dalDB   dal.DBInterface
 	builder func() *dal.QueryBuilder
+	dialect dal.Dialect
 }
 
 func connectWithRetry(t *testing.T, driver, dsn string, maxWait time.Duration) *sql.DB {
@@ -62,37 +63,37 @@ func setupAllDBs(t *testing.T) []*testDB {
 		t.Fatalf("sqlite open: %v", err)
 	}
 	sqliteDalDB := sqlite.NewSQLiteDB(sqliteDB, nil)
+	sqliteQB := sqlite.NewQueryBuilder()
 	dbs = append(dbs, &testDB{
-		name:  "sqlite",
-		db:    sqliteDB,
-		dalDB: sqliteDalDB,
-		builder: func() *dal.QueryBuilder {
-			return sqlite.NewQueryBuilder()
-		},
+		name:    "sqlite",
+		db:      sqliteDB,
+		dalDB:   sqliteDalDB,
+		builder: func() *dal.QueryBuilder { return sqlite.NewQueryBuilder() },
+		dialect: sqliteQB.Dialect(),
 	})
 
 	// MySQL
 	mysqlDB := connectWithRetry(t, "mysql", "root:testpass@tcp(localhost:13306)/godal_test?parseTime=true", 10*time.Second)
 	mysqlDalDB := mysql.NewMySQLDB(mysqlDB, nil)
+	mysqlQB := mysql.NewQueryBuilder()
 	dbs = append(dbs, &testDB{
-		name:  "mysql",
-		db:    mysqlDB,
-		dalDB: mysqlDalDB,
-		builder: func() *dal.QueryBuilder {
-			return mysql.NewQueryBuilder()
-		},
+		name:    "mysql",
+		db:      mysqlDB,
+		dalDB:   mysqlDalDB,
+		builder: func() *dal.QueryBuilder { return mysql.NewQueryBuilder() },
+		dialect: mysqlQB.Dialect(),
 	})
 
 	// PostgreSQL
 	pgDB := connectWithRetry(t, "postgres", "postgres://godal:testpass@localhost:15432/godal_test?sslmode=disable", 10*time.Second)
 	pgDalDB := postgres.NewPostgresDB(pgDB, nil)
+	pgQB := postgres.NewQueryBuilder()
 	dbs = append(dbs, &testDB{
-		name:  "postgres",
-		db:    pgDB,
-		dalDB: pgDalDB,
-		builder: func() *dal.QueryBuilder {
-			return postgres.NewQueryBuilder()
-		},
+		name:    "postgres",
+		db:      pgDB,
+		dalDB:   pgDalDB,
+		builder: func() *dal.QueryBuilder { return postgres.NewQueryBuilder() },
+		dialect: pgQB.Dialect(),
 	})
 
 	// MSSQL - connect to master first, create godal_test, then reconnect
@@ -102,13 +103,13 @@ func setupAllDBs(t *testing.T) []*testDB {
 
 	mssqlDB := connectWithRetry(t, "sqlserver", "sqlserver://sa:TestPass123!@localhost:11433?database=godal_test&encrypt=disable", 10*time.Second)
 	mssqlDalDB := mssql.NewMSSQLDB(mssqlDB, nil)
+	mssqlQB := mssql.NewQueryBuilder()
 	dbs = append(dbs, &testDB{
-		name:  "mssql",
-		db:    mssqlDB,
-		dalDB: mssqlDalDB,
-		builder: func() *dal.QueryBuilder {
-			return mssql.NewQueryBuilder()
-		},
+		name:    "mssql",
+		db:      mssqlDB,
+		dalDB:   mssqlDalDB,
+		builder: func() *dal.QueryBuilder { return mssql.NewQueryBuilder() },
+		dialect: mssqlQB.Dialect(),
 	})
 
 	return dbs
@@ -254,12 +255,8 @@ func seedData(t *testing.T, td *testDB) {
 	t.Helper()
 	ctx := context.Background()
 
-	boolTrue := "TRUE"
-	boolFalse := "FALSE"
-	if td.name == "mssql" {
-		boolTrue = "1"
-		boolFalse = "0"
-	}
+	boolTrue := td.dialect.BoolLiteral(true)
+	boolFalse := td.dialect.BoolLiteral(false)
 
 	// Users
 	_, _ = td.dalDB.Exec(ctx, fmt.Sprintf("INSERT INTO users (name, email, active) VALUES ('Alice', 'alice@example.com', %s)", boolTrue))
