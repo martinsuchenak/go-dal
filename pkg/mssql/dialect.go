@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/martinsuchenak/go-dal/pkg/dal"
+	"github.com/martinsuchenak/xdal/pkg/xdal"
 )
 
 type mssqlDialect struct {
-	*dal.BaseDialect
+	*xdal.BaseDialect
 }
 
 func (d *mssqlDialect) ConcatExpr(parts ...string) string {
@@ -34,11 +34,11 @@ func (d *mssqlDialect) StringAggExpr(col, sep string) string {
 
 func (d *mssqlDialect) RandExpr() string { return "RAND()" }
 
-func NewDialect() dal.Dialect {
-	b := &dal.BaseDialect{
-		Placeholder: dal.AtPPlaceholder,
-		AppendLimit: dal.FetchNextLimit,
-		QuoteStyle:  dal.BracketQuoting,
+func NewDialect() xdal.Dialect {
+	b := &xdal.BaseDialect{
+		Placeholder: xdal.AtPPlaceholder,
+		AppendLimit: xdal.FetchNextLimit,
+		QuoteStyle:  xdal.BracketQuoting,
 	}
 	b.PrependReturning = b.WriteOutput
 	b.AppendReturning = b.WriteOutput

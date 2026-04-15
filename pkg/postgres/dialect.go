@@ -3,11 +3,11 @@ package postgres
 import (
 	"fmt"
 
-	"github.com/martinsuchenak/go-dal/pkg/dal"
+	"github.com/martinsuchenak/xdal/pkg/xdal"
 )
 
 type postgresDialect struct {
-	*dal.BaseDialect
+	*xdal.BaseDialect
 }
 
 func (d *postgresDialect) StringAggExpr(col, sep string) string {
@@ -16,11 +16,11 @@ func (d *postgresDialect) StringAggExpr(col, sep string) string {
 
 func (d *postgresDialect) RandExpr() string { return "RANDOM()" }
 
-func NewDialect() dal.Dialect {
-	b := &dal.BaseDialect{
-		Placeholder: dal.DollarPlaceholder,
-		AppendLimit: dal.LimitOffset,
-		QuoteStyle:  dal.DoubleQuoteQuoting,
+func NewDialect() xdal.Dialect {
+	b := &xdal.BaseDialect{
+		Placeholder: xdal.DollarPlaceholder,
+		AppendLimit: xdal.LimitOffset,
+		QuoteStyle:  xdal.DoubleQuoteQuoting,
 	}
 	b.AppendReturning = b.WriteReturning
 	return &postgresDialect{BaseDialect: b}

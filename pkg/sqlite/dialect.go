@@ -3,11 +3,11 @@ package sqlite
 import (
 	"fmt"
 
-	"github.com/martinsuchenak/go-dal/pkg/dal"
+	"github.com/martinsuchenak/xdal/pkg/xdal"
 )
 
 type sqliteDialect struct {
-	*dal.BaseDialect
+	*xdal.BaseDialect
 }
 
 func (d *sqliteDialect) CurrentTimestamp() string { return "datetime('now')" }
@@ -25,11 +25,11 @@ func (d *sqliteDialect) StringAggExpr(col, sep string) string {
 
 func (d *sqliteDialect) RandExpr() string { return "RANDOM()" }
 
-func NewDialect() dal.Dialect {
-	b := &dal.BaseDialect{
-		Placeholder: dal.QuestionMarkPlaceholder,
-		AppendLimit: dal.LimitOffset,
-		QuoteStyle:  dal.DoubleQuoteQuoting,
+func NewDialect() xdal.Dialect {
+	b := &xdal.BaseDialect{
+		Placeholder: xdal.QuestionMarkPlaceholder,
+		AppendLimit: xdal.LimitOffset,
+		QuoteStyle:  xdal.DoubleQuoteQuoting,
 	}
 	b.AppendReturning = b.WriteReturning
 	return &sqliteDialect{BaseDialect: b}

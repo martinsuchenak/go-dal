@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/martinsuchenak/go-dal/pkg/dal"
+	"github.com/martinsuchenak/xdal/pkg/xdal"
 )
 
 func TestInClause(t *testing.T) {
@@ -12,7 +12,7 @@ func TestInClause(t *testing.T) {
 		ctx := context.Background()
 		qb := td.builder()
 
-		inVals, err := dal.In("Alice", "Charlie")
+		inVals, err := xdal.In("Alice", "Charlie")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -56,7 +56,7 @@ func TestInClauseWithOtherWhere(t *testing.T) {
 		ctx := context.Background()
 		qb := td.builder()
 
-		inVals, err := dal.In("Alice", "Bob", "Charlie")
+		inVals, err := xdal.In("Alice", "Bob", "Charlie")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -96,7 +96,7 @@ func TestInClauseDelete(t *testing.T) {
 		_, _ = td.dalDB.Exec(ctx, "DELETE FROM orders WHERE user_id IN (SELECT id FROM users WHERE name IN ('Alice', 'Bob', 'Charlie'))")
 
 		qb := td.builder()
-		inVals, err := dal.In("Alice", "Bob")
+		inVals, err := xdal.In("Alice", "Bob")
 		if err != nil {
 			t.Fatal(err)
 		}

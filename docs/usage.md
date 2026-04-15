@@ -2,13 +2,13 @@
 
 ## Creating a Database Connection
 
-Each driver wraps a standard `*sql.DB` and accepts a `dal.Logger` (pass `nil` to disable logging):
+Each driver wraps a standard `*sql.DB` and accepts a `xdal.Logger` (pass `nil` to disable logging):
 
 ```go
 import (
     "database/sql"
     _ "github.com/go-sql-driver/mysql"
-    "github.com/martinsuchenak/go-dal/pkg/mysql"
+    "github.com/martinsuchenak/xdal/pkg/mysql"
 )
 
 sqlDB, _ := sql.Open("mysql", "user:pass@tcp(localhost:3306)/mydb")
@@ -104,16 +104,16 @@ qb := mysql.NewQueryBuilder()
 You can also construct one directly if needed:
 
 ```go
-import "github.com/martinsuchenak/go-dal/pkg/dal"
+import "github.com/martinsuchenak/xdal/pkg/xdal"
 
-d := &dal.BaseDialect{
-    Placeholder: dal.QuestionMarkPlaceholder,
-    AppendLimit: dal.LimitOffset,
-    QuoteStyle:  dal.BacktickQuoting,
+d := &xdal.BaseDialect{
+    Placeholder: xdal.QuestionMarkPlaceholder,
+    AppendLimit: xdal.LimitOffset,
+    QuoteStyle:  xdal.BacktickQuoting,
 }
 // Enable RETURNING (optional):
 // d.AppendReturning = d.WriteReturning
-qb := dal.NewQueryBuilder(d)
+qb := xdal.NewQueryBuilder(d)
 ```
 
 ### SELECT
@@ -169,7 +169,7 @@ Use `WhereGroup` to create parenthesized groups of conditions:
 
 ```go
 qb.Where("active = ?", true).
-    WhereGroup(func(g *dal.WhereGroup) {
+    WhereGroup(func(g *xdal.WhereGroup) {
         g.Where("role = ?", "admin").OrWhere("role = ?", "moderator")
     })
 // WHERE active = ? AND (role = ? OR role = ?)
@@ -179,7 +179,7 @@ Use `OrWhereGroup` to combine a group with OR:
 
 ```go
 qb.Where("a = ?", 1).
-    OrWhereGroup(func(g *dal.WhereGroup) {
+    OrWhereGroup(func(g *xdal.WhereGroup) {
         g.Where("b = ?", 2).Where("c = ?", 3)
     })
 // WHERE a = ? OR (b = ? AND c = ?)
@@ -203,10 +203,10 @@ qb.WhereBetween("age", 18, 65)
 
 ### IN Clause
 
-Use `dal.In()` to expand a single placeholder into multiple values:
+Use `xdal.In()` to expand a single placeholder into multiple values:
 
 ```go
-inVals, err := dal.In(1, 2, 3)
+inVals, err := xdal.In(1, 2, 3)
 if err != nil {
     return err
 }
@@ -214,7 +214,7 @@ qb.Where("id IN (?)", inVals)
 // WHERE id IN (?, ?, ?) with args [1, 2, 3]
 ```
 
-`In()` returns an error if no values are provided or if the count exceeds 1000 (`dal.MaxInValues`).
+`In()` returns an error if no values are provided or if the count exceeds 1000 (`xdal.MaxInValues`).
 
 ### JOINs
 
@@ -454,7 +454,7 @@ result, err := db.Exec(ctx, query, args...)
 Both `BaseDB` and `Tx` satisfy the `DBExecutor` interface, so you can write functions that work with either:
 
 ```go
-func getUser(ctx context.Context, db dal.DBExecutor, id int) (string, error) {
+func getUser(ctx context.Context, db xdal.DBExecutor, id int) (string, error) {
     qb := mysql.NewQueryBuilder()
     query, args, err := qb.Select("name").From("users").Where("id = ?", id).Build()
     if err != nil {
@@ -472,7 +472,7 @@ func getUser(ctx context.Context, db dal.DBExecutor, id int) (string, error) {
 
 ### Manual Transactions
 
-`BeginTx` returns a `*dal.Tx` wrapper with logging. Use `tx.Exec`, `tx.Query`, `tx.QueryRow` instead of the raw `*sql.Tx` methods:
+`BeginTx` returns a `*xdal.Tx` wrapper with logging. Use `tx.Exec`, `tx.Query`, `tx.QueryRow` instead of the raw `*sql.Tx` methods:
 
 ```go
 tx, err := db.BeginTx(ctx, nil)
@@ -494,7 +494,7 @@ if err := tx.Commit(); err != nil {
 `WithTx` handles begin/commit/rollback automatically:
 
 ```go
-err := db.WithTx(ctx, nil, func(tx *dal.Tx) error {
+err := db.WithTx(ctx, nil, func(tx *xdal.Tx) error {
     if _, err := tx.Exec(ctx, "INSERT INTO users (name) VALUES (?)", "Alice"); err != nil {
         return err
     }
@@ -613,11 +613,11 @@ Set RETURNING hooks after construction (can't reference methods in struct litera
 
 ```go
 // PostgreSQL/SQLite
-d := &dal.BaseDialect{...}
+d := &xdal.BaseDialect{...}
 d.AppendReturning = d.WriteReturning
 
 // MSSQL
-d := &dal.BaseDialect{...}
+d := &xdal.BaseDialect{...}
 d.PrependReturning = d.WriteOutput   // INSERT: OUTPUT before VALUES
 d.AppendReturning = d.WriteOutput    // UPDATE/DELETE: OUTPUT after WHERE
 
@@ -702,10 +702,10 @@ Quoting is skipped for expressions containing spaces, parentheses, commas, or `A
 
 ### SafeIdentifier
 
-Use `dal.SafeIdentifier()` to validate that a table or column name is safe (letters, digits, underscores, dots only):
+Use `xdal.SafeIdentifier()` to validate that a table or column name is safe (letters, digits, underscores, dots only):
 
 ```go
-if err := dal.SafeIdentifier(userInput); err != nil {
+if err := xdal.SafeIdentifier(userInput); err != nil {
     return fmt.Errorf("invalid identifier: %w", err)
 }
 ```

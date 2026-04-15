@@ -1,27 +1,27 @@
-// Package mysql provides a MySQL driver wrapper for the go-dal database abstraction layer.
+// Package mysql provides a MySQL driver wrapper for the xdal database abstraction layer.
 package mysql
 
 import (
 	"database/sql"
 
-	"github.com/martinsuchenak/go-dal/pkg/dal"
+	"github.com/martinsuchenak/xdal/pkg/xdal"
 )
 
 // Compile-time check that MySQLDB implements DBInterface.
-var _ dal.DBInterface = (*MySQLDB)(nil)
+var _ xdal.DBInterface = (*MySQLDB)(nil)
 
 // MySQLDB wraps a *sql.DB with MySQL-specific query building and optional logging.
 // All DBInterface methods are promoted from the embedded BaseDB.
 type MySQLDB struct {
-	*dal.BaseDB
+	*xdal.BaseDB
 }
 
 // NewMySQLDB creates a new MySQLDB. Pass nil for log to disable logging.
-func NewMySQLDB(db *sql.DB, log dal.Logger) *MySQLDB {
-	return &MySQLDB{BaseDB: dal.NewBaseDB(db, NewDialect(), log)}
+func NewMySQLDB(db *sql.DB, log xdal.Logger) *MySQLDB {
+	return &MySQLDB{BaseDB: xdal.NewBaseDB(db, NewDialect(), log)}
 }
 
 // NewQueryBuilder returns a QueryBuilder configured for MySQL ("?" placeholders).
-func NewQueryBuilder() *dal.QueryBuilder {
-	return dal.NewQueryBuilder(NewDialect())
+func NewQueryBuilder() *xdal.QueryBuilder {
+	return xdal.NewQueryBuilder(NewDialect())
 }

@@ -1,4 +1,4 @@
-package dal
+package xdal
 
 import (
 	"context"
@@ -41,17 +41,17 @@ type DBInterface interface {
 
 var (
 	// ErrEmptyTable is returned by Build when no table name is set.
-	ErrEmptyTable = errors.New("dal: table name is required")
+	ErrEmptyTable = errors.New("xdal: table name is required")
 	// ErrEmptyColumns is returned by BuildInsert/BuildUpdate when no columns are set.
-	ErrEmptyColumns = errors.New("dal: at least one column is required")
+	ErrEmptyColumns = errors.New("xdal: at least one column is required")
 	// ErrEmptyInValues is returned when In() is called with no values.
-	ErrEmptyInValues = errors.New("dal: In() requires at least one value")
+	ErrEmptyInValues = errors.New("xdal: In() requires at least one value")
 	// ErrReturningNotSupported is returned when Returning() is used with a dialect that does not support it.
-	ErrReturningNotSupported = errors.New("dal: RETURNING is not supported by this dialect")
+	ErrReturningNotSupported = errors.New("xdal: RETURNING is not supported by this dialect")
 	// ErrBatchRowLength is returned when a batch insert row has a different column count.
-	ErrBatchRowLength = errors.New("dal: batch row has incorrect number of values")
+	ErrBatchRowLength = errors.New("xdal: batch row has incorrect number of values")
 	// ErrTooManyInValues is returned when In() exceeds the maximum allowed values.
-	ErrTooManyInValues = errors.New("dal: In() exceeds maximum of 1000 values")
+	ErrTooManyInValues = errors.New("xdal: In() exceeds maximum of 1000 values")
 )
 
 // MaxInValues is the upper limit for IN-clause expansion.

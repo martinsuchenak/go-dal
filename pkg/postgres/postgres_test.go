@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/martinsuchenak/go-dal/pkg/dal"
+	"github.com/martinsuchenak/xdal/pkg/xdal"
 
 	_ "modernc.org/sqlite"
 )
@@ -66,7 +66,7 @@ func TestNewQueryBuilderUpdate(t *testing.T) {
 }
 
 func TestInterfaceCompliance(t *testing.T) {
-	var _ dal.DBInterface = (*PostgresDB)(nil)
+	var _ xdal.DBInterface = (*PostgresDB)(nil)
 }
 
 func TestExpressionOverrides(t *testing.T) {

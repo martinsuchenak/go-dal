@@ -1,4 +1,4 @@
-module github.com/martinsuchenak/go-dal
+module github.com/martinsuchenak/xdal
 
 go 1.26.2
 

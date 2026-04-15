@@ -37,19 +37,19 @@ All examples below use the direct execution style with MySQL. Swap the import an
 
 ```go
 // MySQL
-import "github.com/martinsuchenak/go-dal/pkg/mysql"
+import "github.com/martinsuchenak/xdal/pkg/mysql"
 db := mysql.NewMySQLDB(sqlDB, nil)
 
 // PostgreSQL
-import "github.com/martinsuchenak/go-dal/pkg/postgres"
+import "github.com/martinsuchenak/xdal/pkg/postgres"
 db := postgres.NewPostgresDB(sqlDB, nil)
 
 // SQLite
-import "github.com/martinsuchenak/go-dal/pkg/sqlite"
+import "github.com/martinsuchenak/xdal/pkg/sqlite"
 db := sqlite.NewSQLiteDB(sqlDB, nil)
 
 // SQL Server
-import "github.com/martinsuchenak/go-dal/pkg/mssql"
+import "github.com/martinsuchenak/xdal/pkg/mssql"
 db := mssql.NewMSSQLDB(sqlDB, nil)
 ```
 
@@ -67,7 +67,7 @@ import (
     "log"
 
     _ "github.com/go-sql-driver/mysql"
-    "github.com/martinsuchenak/go-dal/pkg/mysql"
+    "github.com/martinsuchenak/xdal/pkg/mysql"
 )
 
 func main() {
@@ -143,7 +143,7 @@ rows, err := db.Select("name").
 ### Select with IN clause
 
 ```go
-inVals, err := dal.In(1, 2, 3, 4, 5)
+inVals, err := xdal.In(1, 2, 3, 4, 5)
 if err != nil {
     log.Fatal(err)
 }
@@ -319,7 +319,7 @@ result, err := db.Exec(ctx, query, args...)
 ### Insert with RETURNING (PostgreSQL)
 
 ```go
-import "github.com/martinsuchenak/go-dal/pkg/postgres"
+import "github.com/martinsuchenak/xdal/pkg/postgres"
 
 qb := postgres.NewQueryBuilder()
 query, args, err := qb.Insert("users").
@@ -338,7 +338,7 @@ db.QueryRow(ctx, query, args...).Scan(&id)
 ### Insert with OUTPUT (SQL Server)
 
 ```go
-import "github.com/martinsuchenak/go-dal/pkg/mssql"
+import "github.com/martinsuchenak/xdal/pkg/mssql"
 
 qb := mssql.NewQueryBuilder()
 query, args, err := qb.Insert("users").
@@ -477,7 +477,7 @@ if err != nil {
 ### Delete with IN clause
 
 ```go
-inVals, err := dal.In(1, 2, 3)
+inVals, err := xdal.In(1, 2, 3)
 if err != nil {
     log.Fatal(err)
 }
@@ -560,7 +560,7 @@ tx.Commit()
 ### Using WithTx helper
 
 ```go
-err := db.WithTx(ctx, nil, func(tx *dal.Tx) error {
+err := db.WithTx(ctx, nil, func(tx *xdal.Tx) error {
     query, args, err := qb.Insert("orders").
         Set("user_id", 1).
         Set("total", 99.99).

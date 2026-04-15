@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/martinsuchenak/go-dal/pkg/dal"
+	"github.com/martinsuchenak/xdal/pkg/xdal"
 )
 
 func TestWhereIsNull(t *testing.T) {
@@ -50,7 +50,7 @@ func TestOrWhereGroup(t *testing.T) {
 		query, args, err := td.builder().Select("name").
 			From("users").
 			Where("active = ?", true).
-			OrWhereGroup(func(g *dal.WhereGroup) {
+			OrWhereGroup(func(g *xdal.WhereGroup) {
 				g.Where("name = ?", "Charlie").Where("email = ?", "charlie@example.com")
 			}).
 			OrderBy("name").
@@ -200,26 +200,26 @@ func TestPing(t *testing.T) {
 }
 
 func TestErrEmptyTable(t *testing.T) {
-	d := &dal.BaseDialect{Placeholder: dal.QuestionMarkPlaceholder}
-	qb := dal.NewQueryBuilder(d)
+	d := &xdal.BaseDialect{Placeholder: xdal.QuestionMarkPlaceholder}
+	qb := xdal.NewQueryBuilder(d)
 
 	_, _, err := qb.Select("id").Build()
-	if err != dal.ErrEmptyTable {
+	if err != xdal.ErrEmptyTable {
 		t.Fatalf("select no table: got err %v, want ErrEmptyTable", err)
 	}
 
 	_, _, err = qb.Insert("").Set("id", 1).Build()
-	if err != dal.ErrEmptyTable {
+	if err != xdal.ErrEmptyTable {
 		t.Errorf("insert empty table: got err %v, want ErrEmptyTable", err)
 	}
 
 	_, _, err = qb.Update("").Set("name", "x").Build()
-	if err != dal.ErrEmptyTable {
+	if err != xdal.ErrEmptyTable {
 		t.Errorf("update empty table: got err %v, want ErrEmptyTable", err)
 	}
 
 	_, _, err = qb.Delete("").Build()
-	if err != dal.ErrEmptyTable {
+	if err != xdal.ErrEmptyTable {
 		t.Errorf("delete empty table: got err %v, want ErrEmptyTable", err)
 	}
 }
@@ -227,28 +227,28 @@ func TestErrEmptyTable(t *testing.T) {
 func TestErrEmptyColumns(t *testing.T) {
 	runForEachDB(t, func(t *testing.T, td *testDB) {
 		_, _, err := td.builder().Insert("users").Build()
-		if err != dal.ErrEmptyColumns {
+		if err != xdal.ErrEmptyColumns {
 			t.Errorf("got err %v, want ErrEmptyColumns", err)
 		}
 
 		_, _, err = td.builder().Update("users").Where("id = ?", 1).Build()
-		if err != dal.ErrEmptyColumns {
+		if err != xdal.ErrEmptyColumns {
 			t.Errorf("got err %v, want ErrEmptyColumns", err)
 		}
 	})
 }
 
 func TestErrEmptyInValues(t *testing.T) {
-	_, err := dal.In()
-	if err != dal.ErrEmptyInValues {
+	_, err := xdal.In()
+	if err != xdal.ErrEmptyInValues {
 		t.Errorf("got err %v, want ErrEmptyInValues", err)
 	}
 }
 
 func TestErrTooManyInValues(t *testing.T) {
 	vals := make([]interface{}, 1001)
-	_, err := dal.In(vals...)
-	if err != dal.ErrTooManyInValues {
+	_, err := xdal.In(vals...)
+	if err != xdal.ErrTooManyInValues {
 		t.Errorf("got err %v, want ErrTooManyInValues", err)
 	}
 }
@@ -260,7 +260,7 @@ func TestErrReturningNotSupported(t *testing.T) {
 				Set("name", "Test").
 				Returning("id").
 				Build()
-			if err != dal.ErrReturningNotSupported {
+			if err != xdal.ErrReturningNotSupported {
 				t.Errorf("got err %v, want ErrReturningNotSupported", err)
 			}
 		}
@@ -274,7 +274,7 @@ func TestErrBatchRowLength(t *testing.T) {
 			Values("Alice", "alice@test.com").
 			Values("Bob").
 			Build()
-		if err != dal.ErrBatchRowLength {
+		if err != xdal.ErrBatchRowLength {
 			t.Errorf("got err %v, want ErrBatchRowLength", err)
 		}
 	})
@@ -290,7 +290,7 @@ func TestLoggingWithMockLogger(t *testing.T) {
 		ctx := context.Background()
 
 		sqlDB := td.db
-		bdb := dal.NewBaseDB(sqlDB, td.dialect, log)
+		bdb := xdal.NewBaseDB(sqlDB, td.dialect, log)
 		bdb.SetLogArgs(true)
 
 		_, err := bdb.Exec(ctx, "INSERT INTO users (name, email, active) VALUES (?, ?, ?)", "LogUser", "log@test.com", true)
@@ -320,7 +320,7 @@ func TestLoggingSetLogArgsRedacted(t *testing.T) {
 		ctx := context.Background()
 
 		sqlDB := td.db
-		bdb := dal.NewBaseDB(sqlDB, td.dialect, log)
+		bdb := xdal.NewBaseDB(sqlDB, td.dialect, log)
 		bdb.SetLogArgs(false)
 
 		_, err := bdb.Exec(ctx, "INSERT INTO users (name, email, active) VALUES (?, ?, ?)", "RedactUser", "redact@test.com", true)

@@ -1,14 +1,14 @@
 package mysql
 
-import "github.com/martinsuchenak/go-dal/pkg/dal"
+import "github.com/martinsuchenak/xdal/pkg/xdal"
 
 // NewDialect returns a Dialect configured for MySQL.
 // MySQL does not support RETURNING — neither hook is set.
-func NewDialect() dal.Dialect {
-	return &dal.BaseDialect{
-		Placeholder:      dal.QuestionMarkPlaceholder,
-		AppendLimit:      dal.LimitOffset,
-		QuoteStyle:       dal.BacktickQuoting,
+func NewDialect() xdal.Dialect {
+	return &xdal.BaseDialect{
+		Placeholder:      xdal.QuestionMarkPlaceholder,
+		AppendLimit:      xdal.LimitOffset,
+		QuoteStyle:       xdal.BacktickQuoting,
 		BackslashEscapes: true,
 	}
 }

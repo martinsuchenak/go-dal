@@ -1,17 +1,17 @@
-package dal_test
+package xdal_test
 
 import (
 	"fmt"
 
-	"github.com/martinsuchenak/go-dal/pkg/dal"
+	"github.com/martinsuchenak/xdal/pkg/xdal"
 )
 
 func Example_queryBuilder() {
-	d := &dal.BaseDialect{
-		Placeholder: dal.QuestionMarkPlaceholder,
-		AppendLimit: dal.LimitOffset,
+	d := &xdal.BaseDialect{
+		Placeholder: xdal.QuestionMarkPlaceholder,
+		AppendLimit: xdal.LimitOffset,
 	}
-	qb := dal.NewQueryBuilder(d)
+	qb := xdal.NewQueryBuilder(d)
 
 	query, args, err := qb.Select("id", "name").
 		From("users").
@@ -34,11 +34,11 @@ func Example_queryBuilder() {
 }
 
 func Example_insertQuery() {
-	d := &dal.BaseDialect{
-		Placeholder: dal.QuestionMarkPlaceholder,
-		AppendLimit: dal.LimitOffset,
+	d := &xdal.BaseDialect{
+		Placeholder: xdal.QuestionMarkPlaceholder,
+		AppendLimit: xdal.LimitOffset,
 	}
-	qb := dal.NewQueryBuilder(d)
+	qb := xdal.NewQueryBuilder(d)
 
 	query, args, err := qb.Insert("users").
 		Set("name", "John").
@@ -57,11 +57,11 @@ func Example_insertQuery() {
 }
 
 func Example_updateQuery() {
-	d := &dal.BaseDialect{
-		Placeholder: dal.QuestionMarkPlaceholder,
-		AppendLimit: dal.LimitOffset,
+	d := &xdal.BaseDialect{
+		Placeholder: xdal.QuestionMarkPlaceholder,
+		AppendLimit: xdal.LimitOffset,
 	}
-	qb := dal.NewQueryBuilder(d)
+	qb := xdal.NewQueryBuilder(d)
 
 	query, args, err := qb.Update("users").
 		Set("email", "new@example.com").
@@ -80,11 +80,11 @@ func Example_updateQuery() {
 }
 
 func Example_deleteQuery() {
-	d := &dal.BaseDialect{
-		Placeholder: dal.QuestionMarkPlaceholder,
-		AppendLimit: dal.LimitOffset,
+	d := &xdal.BaseDialect{
+		Placeholder: xdal.QuestionMarkPlaceholder,
+		AppendLimit: xdal.LimitOffset,
 	}
-	qb := dal.NewQueryBuilder(d)
+	qb := xdal.NewQueryBuilder(d)
 
 	query, args, err := qb.Delete("users").
 		Where("active = ?", false).
@@ -102,11 +102,11 @@ func Example_deleteQuery() {
 }
 
 func Example_selectWithJoin() {
-	d := &dal.BaseDialect{
-		Placeholder: dal.QuestionMarkPlaceholder,
-		AppendLimit: dal.LimitOffset,
+	d := &xdal.BaseDialect{
+		Placeholder: xdal.QuestionMarkPlaceholder,
+		AppendLimit: xdal.LimitOffset,
 	}
-	qb := dal.NewQueryBuilder(d)
+	qb := xdal.NewQueryBuilder(d)
 
 	query, args, err := qb.Select("u.name", "o.total").
 		From("users u").
@@ -127,11 +127,11 @@ func Example_selectWithJoin() {
 }
 
 func Example_postgresPlaceholders() {
-	d := &dal.BaseDialect{
-		Placeholder: dal.DollarPlaceholder,
-		AppendLimit: dal.LimitOffset,
+	d := &xdal.BaseDialect{
+		Placeholder: xdal.DollarPlaceholder,
+		AppendLimit: xdal.LimitOffset,
 	}
-	qb := dal.NewQueryBuilder(d)
+	qb := xdal.NewQueryBuilder(d)
 
 	query, args, err := qb.Select("id").
 		From("users").
@@ -151,11 +151,11 @@ func Example_postgresPlaceholders() {
 }
 
 func Example_mssqlPlaceholders() {
-	d := &dal.BaseDialect{
-		Placeholder: dal.AtPPlaceholder,
-		AppendLimit: dal.FetchNextLimit,
+	d := &xdal.BaseDialect{
+		Placeholder: xdal.AtPPlaceholder,
+		AppendLimit: xdal.FetchNextLimit,
 	}
-	qb := dal.NewQueryBuilder(d)
+	qb := xdal.NewQueryBuilder(d)
 
 	query, args, err := qb.Select("id", "name").
 		From("users").

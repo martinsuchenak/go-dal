@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/martinsuchenak/go-dal/pkg/dal"
+	"github.com/martinsuchenak/xdal/pkg/xdal"
 )
 
 func TestWhereGroupIntegration(t *testing.T) {
@@ -16,7 +16,7 @@ func TestWhereGroupIntegration(t *testing.T) {
 		query, args, err := qb.Select("name").
 			From("users").
 			Where("active = ?", true).
-			WhereGroup(func(g *dal.WhereGroup) {
+			WhereGroup(func(g *xdal.WhereGroup) {
 				g.Where("name = ?", "Alice").OrWhere("name = ?", "Bob")
 			}).
 			Build()

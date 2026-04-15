@@ -1,13 +1,13 @@
-# GO-DAL Development Plan
+# XDAL Development Plan
 
 ## Project Overview
-GO-DAL is a lightweight, interface-driven database abstraction layer for Go that allows developers to write database-agnostic SQL queries across MySQL, PostgreSQL, SQLite, and SQL Server.
+XDAL is a lightweight, interface-driven database abstraction layer for Go that allows developers to write database-agnostic SQL queries across MySQL, PostgreSQL, SQLite, and SQL Server.
 
 ---
 
 ## Phase 1: Project Setup
 - [x] Initialize Go module (go 1.26.2)
-- [x] Create project structure (`pkg/dal`, `pkg/mysql`, etc.)
+- [x] Create project structure (`pkg/xdal`, `pkg/mysql`, etc.)
 - [x] Set up configuration files (.gitignore, Taskfile.yml)
 - [x] Remove standalone app artifacts (main.go, cmd/) -- this is a library only
 
@@ -28,7 +28,7 @@ GO-DAL is a lightweight, interface-driven database abstraction layer for Go that
 - [x] Automatic placeholder numbering across multiple WHERE clauses
 - [x] OR support in WHERE (OrWhere) and HAVING (OrHaving)
 - [x] DISTINCT support
-- [x] IN-clause expansion (dal.In) with MaxInValues cap (1000)
+- [x] IN-clause expansion (xdal.In) with MaxInValues cap (1000)
 - [x] Batch INSERT (Columns + Values)
 - [x] INSERT RETURNING / OUTPUT
 - [x] UPDATE RETURNING / OUTPUT
@@ -46,7 +46,7 @@ GO-DAL is a lightweight, interface-driven database abstraction layer for Go that
 - [x] SQL Server driver wrapper (`pkg/mssql`) — `@p1, @p2, ...` placeholders, bracket quoting, OUTPUT
 - [x] Compile-time interface compliance checks for all drivers
 - [x] Each driver provides `NewQueryBuilder()` pre-configured with correct dialect
-- [x] Shared `BaseDB` in `pkg/dal` eliminates duplication across drivers
+- [x] Shared `BaseDB` in `pkg/xdal` eliminates duplication across drivers
 
 ## Phase 5: Logging Layer
 - [x] Define `Logger` interface (compatible with `fortix/go-libs/logger`)
@@ -88,13 +88,13 @@ GO-DAL is a lightweight, interface-driven database abstraction layer for Go that
 
 ## Phase 8: Portability Expression Helpers
 - [x] 6 portable expression methods on `Dialect` interface: ConcatExpr, LengthExpr, CurrentTimestamp, BoolLiteral, StringAggExpr, RandExpr
-- [x] `BaseDialect` default implementations in `pkg/dal/expressions.go`
+- [x] `BaseDialect` default implementations in `pkg/xdal/expressions.go`
 - [x] `QueryBuilder` convenience wrappers (`qb.ConcatExpr()`, etc.) — no driver-specific imports needed
-- [x] MSSQL overrides all 6 via `mssqlDialect` struct (embeds `*dal.BaseDialect`)
+- [x] MSSQL overrides all 6 via `mssqlDialect` struct (embeds `*xdal.BaseDialect`)
 - [x] PostgreSQL overrides `StringAggExpr`, `RandExpr` via `postgresDialect`
 - [x] SQLite overrides `CurrentTimestamp`, `BoolLiteral`, `StringAggExpr`, `RandExpr` via `sqliteDialect`
-- [x] MySQL uses plain `*dal.BaseDialect` (all defaults work)
-- [x] Unit tests in `pkg/dal/expressions_test.go`
+- [x] MySQL uses plain `*xdal.BaseDialect` (all defaults work)
+- [x] Unit tests in `pkg/xdal/expressions_test.go`
 - [x] Integration tests in `tests/integration/expressions_test.go`
 - [x] Removed stale driver-level expression files (`pkg/*/expressions.go`, `pkg/*/expressions_test.go`)
 - [x] Updated documentation (`docs/usage.md`, `AGENTS.md`)

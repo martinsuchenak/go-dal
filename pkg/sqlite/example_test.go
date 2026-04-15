@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/martinsuchenak/go-dal/pkg/sqlite"
+	"github.com/martinsuchenak/xdal/pkg/sqlite"
 
 	_ "modernc.org/sqlite"
 )
@@ -18,10 +18,10 @@ func Example_sqliteCRUD() {
 	}
 	defer func() { _ = db.Close() }()
 
-	dal := sqlite.NewSQLiteDB(db, nil)
+	xdalDB := sqlite.NewSQLiteDB(db, nil)
 
 	ctx := context.Background()
-	_, _ = dal.Exec(ctx, "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT)")
+	_, _ = xdalDB.Exec(ctx, "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT)")
 
 	qb := sqlite.NewQueryBuilder()
 
@@ -33,7 +33,7 @@ func Example_sqliteCRUD() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, _ = dal.Exec(ctx, insertQ, insertArgs...)
+	_, _ = xdalDB.Exec(ctx, insertQ, insertArgs...)
 
 	// Select
 	qb = sqlite.NewQueryBuilder()
@@ -46,7 +46,7 @@ func Example_sqliteCRUD() {
 	}
 
 	var name, email string
-	_ = dal.QueryRow(ctx, selQ, selArgs...).Scan(&name, &email)
+	_ = xdalDB.QueryRow(ctx, selQ, selArgs...).Scan(&name, &email)
 	fmt.Println(name, email)
 
 	// Update
@@ -58,7 +58,7 @@ func Example_sqliteCRUD() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, _ = dal.Exec(ctx, updQ, updArgs...)
+	_, _ = xdalDB.Exec(ctx, updQ, updArgs...)
 
 	// Delete
 	qb = sqlite.NewQueryBuilder()
@@ -68,7 +68,7 @@ func Example_sqliteCRUD() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, _ = dal.Exec(ctx, delQ, delArgs...)
+	_, _ = xdalDB.Exec(ctx, delQ, delArgs...)
 
 	// Output: Alice alice@example.com
 }

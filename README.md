@@ -1,4 +1,4 @@
-# GO-DAL
+# XDAL
 
 A lightweight, interface-driven database abstraction layer for Go.
 
@@ -7,14 +7,14 @@ Write database-agnostic SQL queries across **MySQL**, **PostgreSQL**, **SQLite**
 ## Install
 
 ```bash
-go get github.com/martinsuchenak/go-dal
+go get github.com/martinsuchenak/xdal
 ```
 
 ## Quick Example
 
 ```go
 import (
-    "github.com/martinsuchenak/go-dal/pkg/mysql"
+    "github.com/martinsuchenak/xdal/pkg/mysql"
 )
 
 db := mysql.NewMySQLDB(sqlDB, nil)

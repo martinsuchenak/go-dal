@@ -11,20 +11,20 @@ import (
 	_ "github.com/lib/pq"
 	_ "github.com/microsoft/go-mssqldb"
 
-	"github.com/martinsuchenak/go-dal/pkg/dal"
-	"github.com/martinsuchenak/go-dal/pkg/mssql"
-	"github.com/martinsuchenak/go-dal/pkg/mysql"
-	"github.com/martinsuchenak/go-dal/pkg/postgres"
-	"github.com/martinsuchenak/go-dal/pkg/sqlite"
+	"github.com/martinsuchenak/xdal/pkg/xdal"
+	"github.com/martinsuchenak/xdal/pkg/mssql"
+	"github.com/martinsuchenak/xdal/pkg/mysql"
+	"github.com/martinsuchenak/xdal/pkg/postgres"
+	"github.com/martinsuchenak/xdal/pkg/sqlite"
 	_ "modernc.org/sqlite"
 )
 
 type testDB struct {
 	name    string
 	db      *sql.DB
-	dalDB   dal.DBInterface
-	builder func() *dal.QueryBuilder
-	dialect dal.Dialect
+	dalDB   xdal.DBInterface
+	builder func() *xdal.QueryBuilder
+	dialect xdal.Dialect
 }
 
 func connectWithRetry(t *testing.T, driver, dsn string, maxWait time.Duration) *sql.DB {
@@ -68,47 +68,47 @@ func setupAllDBs(t *testing.T) []*testDB {
 		name:    "sqlite",
 		db:      sqliteDB,
 		dalDB:   sqliteDalDB,
-		builder: func() *dal.QueryBuilder { return sqlite.NewQueryBuilder() },
+		builder: func() *xdal.QueryBuilder { return sqlite.NewQueryBuilder() },
 		dialect: sqliteQB.Dialect(),
 	})
 
 	// MySQL
-	mysqlDB := connectWithRetry(t, "mysql", "root:testpass@tcp(localhost:13306)/godal_test?parseTime=true", 10*time.Second)
+	mysqlDB := connectWithRetry(t, "mysql", "root:testpass@tcp(localhost:13306)/xdal_test?parseTime=true", 10*time.Second)
 	mysqlDalDB := mysql.NewMySQLDB(mysqlDB, nil)
 	mysqlQB := mysql.NewQueryBuilder()
 	dbs = append(dbs, &testDB{
 		name:    "mysql",
 		db:      mysqlDB,
 		dalDB:   mysqlDalDB,
-		builder: func() *dal.QueryBuilder { return mysql.NewQueryBuilder() },
+		builder: func() *xdal.QueryBuilder { return mysql.NewQueryBuilder() },
 		dialect: mysqlQB.Dialect(),
 	})
 
 	// PostgreSQL
-	pgDB := connectWithRetry(t, "postgres", "postgres://godal:testpass@localhost:15432/godal_test?sslmode=disable", 10*time.Second)
+	pgDB := connectWithRetry(t, "postgres", "postgres://xdal:testpass@localhost:15432/xdal_test?sslmode=disable", 10*time.Second)
 	pgDalDB := postgres.NewPostgresDB(pgDB, nil)
 	pgQB := postgres.NewQueryBuilder()
 	dbs = append(dbs, &testDB{
 		name:    "postgres",
 		db:      pgDB,
 		dalDB:   pgDalDB,
-		builder: func() *dal.QueryBuilder { return postgres.NewQueryBuilder() },
+		builder: func() *xdal.QueryBuilder { return postgres.NewQueryBuilder() },
 		dialect: pgQB.Dialect(),
 	})
 
-	// MSSQL - connect to master first, create godal_test, then reconnect
+	// MSSQL - connect to master first, create xdal_test, then reconnect
 	mssqlMaster := connectWithRetry(t, "sqlserver", "sqlserver://sa:TestPass123!@localhost:11433?encrypt=disable", 15*time.Second)
-	_, _ = mssqlMaster.Exec("IF DB_ID('godal_test') IS NULL CREATE DATABASE godal_test")
+	_, _ = mssqlMaster.Exec("IF DB_ID('xdal_test') IS NULL CREATE DATABASE xdal_test")
 	_ = mssqlMaster.Close()
 
-	mssqlDB := connectWithRetry(t, "sqlserver", "sqlserver://sa:TestPass123!@localhost:11433?database=godal_test&encrypt=disable", 10*time.Second)
+	mssqlDB := connectWithRetry(t, "sqlserver", "sqlserver://sa:TestPass123!@localhost:11433?database=xdal_test&encrypt=disable", 10*time.Second)
 	mssqlDalDB := mssql.NewMSSQLDB(mssqlDB, nil)
 	mssqlQB := mssql.NewQueryBuilder()
 	dbs = append(dbs, &testDB{
 		name:    "mssql",
 		db:      mssqlDB,
 		dalDB:   mssqlDalDB,
-		builder: func() *dal.QueryBuilder { return mssql.NewQueryBuilder() },
+		builder: func() *xdal.QueryBuilder { return mssql.NewQueryBuilder() },
 		dialect: mssqlQB.Dialect(),
 	})
 

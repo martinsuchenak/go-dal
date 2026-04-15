@@ -1,4 +1,4 @@
-package dal
+package xdal
 
 import (
 	"fmt"
@@ -691,7 +691,7 @@ func (d *BaseDialect) BuildDelete(q *DeleteQuery) (string, []interface{}, error)
 // SafeIdentifier validates that a name is a safe SQL identifier (letters, digits, underscores, dots).
 func SafeIdentifier(name string) error {
 	if len(name) == 0 {
-		return fmt.Errorf("dal: invalid identifier %q", name)
+		return fmt.Errorf("xdal: invalid identifier %q", name)
 	}
 	for i, ch := range name {
 		if ch == '.' {
@@ -699,11 +699,11 @@ func SafeIdentifier(name string) error {
 		}
 		if i == 0 {
 			if (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') && ch != '_' {
-				return fmt.Errorf("dal: invalid identifier %q", name)
+				return fmt.Errorf("xdal: invalid identifier %q", name)
 			}
 		} else {
 			if (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') && (ch < '0' || ch > '9') && ch != '_' {
-				return fmt.Errorf("dal: invalid identifier %q", name)
+				return fmt.Errorf("xdal: invalid identifier %q", name)
 			}
 		}
 	}

@@ -5,7 +5,7 @@ services:
       - "13306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: testpass
-      MYSQL_DATABASE: godal_test
+      MYSQL_DATABASE: xdal_test
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 3s
@@ -17,11 +17,11 @@ services:
     ports:
       - "15432:5432"
     environment:
-      POSTGRES_USER: godal
+      POSTGRES_USER: xdal
       POSTGRES_PASSWORD: testpass
-      POSTGRES_DB: godal_test
+      POSTGRES_DB: xdal_test
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U godal -d godal_test"]
+      test: ["CMD-SHELL", "pg_isready -U xdal -d xdal_test"]
       interval: 3s
       timeout: 3s
       retries: 10

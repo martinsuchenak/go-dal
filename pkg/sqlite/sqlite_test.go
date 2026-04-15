@@ -3,7 +3,7 @@ package sqlite
 import (
 	"testing"
 
-	"github.com/martinsuchenak/go-dal/pkg/dal"
+	"github.com/martinsuchenak/xdal/pkg/xdal"
 )
 
 func TestNewQueryBuilderUsesQuestionMark(t *testing.T) {
@@ -44,7 +44,7 @@ func TestNewQueryBuilderSelectWhere(t *testing.T) {
 }
 
 func TestInterfaceCompliance(t *testing.T) {
-	var _ dal.DBInterface = (*SQLiteDB)(nil)
+	var _ xdal.DBInterface = (*SQLiteDB)(nil)
 }
 
 func TestExpressionOverrides(t *testing.T) {

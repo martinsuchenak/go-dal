@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/martinsuchenak/go-dal/pkg/dal"
+	"github.com/martinsuchenak/xdal/pkg/xdal"
 
 	_ "modernc.org/sqlite"
 )
@@ -47,7 +47,7 @@ func TestNewQueryBuilderSelectWhere(t *testing.T) {
 }
 
 func TestInterfaceCompliance(t *testing.T) {
-	var _ dal.DBInterface = (*MySQLDB)(nil)
+	var _ xdal.DBInterface = (*MySQLDB)(nil)
 }
 
 func TestTranslateSQL(t *testing.T) {

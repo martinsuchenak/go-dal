@@ -1,4 +1,4 @@
-package dal
+package xdal
 
 import (
 	"context"
@@ -189,7 +189,7 @@ func (q *SelectQuery) Build() (string, []interface{}, error) {
 // Returns an error if the query was not created via a DB factory method.
 func (q *SelectQuery) Query(ctx context.Context) (*sql.Rows, error) {
 	if q.db == nil {
-		return nil, fmt.Errorf("dal: query not bound to a database, use db.Select() instead of qb.Select()")
+		return nil, fmt.Errorf("xdal: query not bound to a database, use db.Select() instead of qb.Select()")
 	}
 	query, args, err := q.Build()
 	if err != nil {
@@ -300,7 +300,7 @@ func (q *InsertQuery) Build() (string, []interface{}, error) {
 // Returns an error if the query was not created via a DB factory method.
 func (q *InsertQuery) Exec(ctx context.Context) (sql.Result, error) {
 	if q.db == nil {
-		return nil, fmt.Errorf("dal: query not bound to a database, use db.Insert() instead of qb.Insert()")
+		return nil, fmt.Errorf("xdal: query not bound to a database, use db.Insert() instead of qb.Insert()")
 	}
 	query, args, err := q.Build()
 	if err != nil {
@@ -382,7 +382,7 @@ func (q *UpdateQuery) Build() (string, []interface{}, error) {
 // Returns an error if the query was not created via a DB factory method.
 func (q *UpdateQuery) Exec(ctx context.Context) (sql.Result, error) {
 	if q.db == nil {
-		return nil, fmt.Errorf("dal: query not bound to a database, use db.Update() instead of qb.Update()")
+		return nil, fmt.Errorf("xdal: query not bound to a database, use db.Update() instead of qb.Update()")
 	}
 	query, args, err := q.Build()
 	if err != nil {
@@ -432,7 +432,7 @@ func (q *DeleteQuery) Build() (string, []interface{}, error) {
 // Returns an error if the query was not created via a DB factory method.
 func (q *DeleteQuery) Exec(ctx context.Context) (sql.Result, error) {
 	if q.db == nil {
-		return nil, fmt.Errorf("dal: query not bound to a database, use db.Delete() instead of qb.Delete()")
+		return nil, fmt.Errorf("xdal: query not bound to a database, use db.Delete() instead of qb.Delete()")
 	}
 	query, args, err := q.Build()
 	if err != nil {

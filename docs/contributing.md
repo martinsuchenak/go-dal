@@ -1,4 +1,4 @@
-# Contributing to GO-DAL
+# Contributing to XDAL
 
 ## Development Setup
 
@@ -17,7 +17,7 @@ brew install go-task
 ### Project Structure
 
 ```
-go-dal/
+xdal/
 ├── pkg/
 │   ├── dal/                    # Core: types, query builder, dialect, logging
 │   │   ├── types.go            # DBInterface, query structs, error sentinels
@@ -92,12 +92,12 @@ task test && task docker-up && task test-integration
 
 ### How the Pieces Fit
 
-1. **`DBInterface`** (`pkg/dal/types.go`) — contract for all drivers (Exec, Query, QueryRow, BeginTx, Ping, Close)
-2. **`BaseDB`** (`pkg/dal/logger.go`) — shared implementation of `DBInterface` with structured logging
-3. **Driver structs** (`pkg/mysql/mysql.go`, etc.) — embed `*dal.BaseDB`, get all methods promoted automatically
-4. **`Dialect`** (`pkg/dal/dialect.go`) — interface for SQL generation, implemented by `BaseDialect`
-5. **`QueryBuilder`** (`pkg/dal/query_builder.go`) — fluent API that delegates `Build()` to the dialect
-6. **`Tx`** (`pkg/dal/logger.go`) — transaction wrapper with logging
+1. **`DBInterface`** (`pkg/xdal/types.go`) — contract for all drivers (Exec, Query, QueryRow, BeginTx, Ping, Close)
+2. **`BaseDB`** (`pkg/xdal/logger.go`) — shared implementation of `DBInterface` with structured logging
+3. **Driver structs** (`pkg/mysql/mysql.go`, etc.) — embed `*xdal.BaseDB`, get all methods promoted automatically
+4. **`Dialect`** (`pkg/xdal/dialect.go`) — interface for SQL generation, implemented by `BaseDialect`
+5. **`QueryBuilder`** (`pkg/xdal/query_builder.go`) — fluent API that delegates `Build()` to the dialect
+6. **`Tx`** (`pkg/xdal/logger.go`) — transaction wrapper with logging
 
 ### Data Flow
 
@@ -141,20 +141,20 @@ package yourdb
 
 import (
     "database/sql"
-    "github.com/martinsuchenak/go-dal/pkg/dal"
+    "github.com/martinsuchenak/xdal/pkg/xdal"
 )
 
 // Compile-time interface check
-var _ dal.DBInterface = (*YourDB)(nil)
+var _ xdal.DBInterface = (*YourDB)(nil)
 
 // YourDB wraps a *sql.DB with your-database-specific query building.
 type YourDB struct {
-    *dal.BaseDB
+    *xdal.BaseDB
 }
 
 // NewYourDB creates a new YourDB. Pass nil for log to disable logging.
-func NewYourDB(db *sql.DB, log dal.Logger) *YourDB {
-    return &YourDB{BaseDB: dal.NewBaseDB(db, log)}
+func NewYourDB(db *sql.DB, log xdal.Logger) *YourDB {
+    return &YourDB{BaseDB: xdal.NewBaseDB(db, log)}
 }
 ```
 
@@ -165,13 +165,13 @@ Create `pkg/yourdb/dialect.go`:
 ```go
 package yourdb
 
-import "github.com/martinsuchenak/go-dal/pkg/dal"
+import "github.com/martinsuchenak/xdal/pkg/xdal"
 
-func NewDialect() dal.Dialect {
-    d := &dal.BaseDialect{
-        Placeholder: dal.QuestionMarkPlaceholder, // or DollarPlaceholder, AtPPlaceholder
-        AppendLimit: dal.LimitOffset,             // or FetchNextLimit
-        QuoteStyle:  dal.DoubleQuoteQuoting,      // or BacktickQuoting, BracketQuoting, NoQuoting
+func NewDialect() xdal.Dialect {
+    d := &xdal.BaseDialect{
+        Placeholder: xdal.QuestionMarkPlaceholder, // or DollarPlaceholder, AtPPlaceholder
+        AppendLimit: xdal.LimitOffset,             // or FetchNextLimit
+        QuoteStyle:  xdal.DoubleQuoteQuoting,      // or BacktickQuoting, BracketQuoting, NoQuoting
     }
     // Enable RETURNING if supported:
     // d.AppendReturning = d.WriteReturning   // PostgreSQL/SQLite style
@@ -187,8 +187,8 @@ The function-field pattern (`Placeholder`, `AppendLimit`, `AppendReturning`, `Pr
 Add to `pkg/yourdb/yourdb.go`:
 
 ```go
-func NewQueryBuilder() *dal.QueryBuilder {
-    return dal.NewQueryBuilder(NewDialect())
+func NewQueryBuilder() *xdal.QueryBuilder {
+    return xdal.NewQueryBuilder(NewDialect())
 }
 ```
 
@@ -198,10 +198,10 @@ If your database has quirks beyond what `BaseDialect` handles (e.g., different i
 
 ```go
 type YourDialect struct {
-    dal.BaseDialect
+    xdal.BaseDialect
 }
 
-func (d *YourDialect) BuildInsert(q *dal.InsertQuery) (string, []interface{}, error) {
+func (d *YourDialect) BuildInsert(q *xdal.InsertQuery) (string, []interface{}, error) {
     // custom INSERT rendering
     // you can call d.BaseDialect.BuildInsert(q) for the default behavior
     // and then modify the result
@@ -211,12 +211,12 @@ func (d *YourDialect) BuildInsert(q *dal.InsertQuery) (string, []interface{}, er
 Then use your custom dialect in `NewDialect()`:
 
 ```go
-func NewDialect() dal.Dialect {
+func NewDialect() xdal.Dialect {
     d := &YourDialect{
-        BaseDialect: dal.BaseDialect{
-            Placeholder: dal.DollarPlaceholder,
-            AppendLimit: dal.LimitOffset,
-            QuoteStyle:  dal.DoubleQuoteQuoting,
+        BaseDialect: xdal.BaseDialect{
+            Placeholder: xdal.DollarPlaceholder,
+            AppendLimit: xdal.LimitOffset,
+            QuoteStyle:  xdal.DoubleQuoteQuoting,
         },
     }
     d.AppendReturning = d.WriteReturning
@@ -233,7 +233,7 @@ package yourdb
 
 import (
     "testing"
-    "github.com/martinsuchenak/go-dal/pkg/dal"
+    "github.com/martinsuchenak/xdal/pkg/xdal"
 )
 
 func TestNewQueryBuilderUsesCorrectPlaceholders(t *testing.T) {
@@ -253,7 +253,7 @@ func TestNewQueryBuilderUsesCorrectPlaceholders(t *testing.T) {
 }
 
 func TestInterfaceCompliance(t *testing.T) {
-    var _ dal.DBInterface = (*YourDB)(nil)
+    var _ xdal.DBInterface = (*YourDB)(nil)
 }
 ```
 

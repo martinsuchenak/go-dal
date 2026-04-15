@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/martinsuchenak/go-dal/pkg/dal"
+	"github.com/martinsuchenak/xdal/pkg/xdal"
 )
 
 func TestWithTxCommit(t *testing.T) {
 	runForEachDB(t, func(t *testing.T, td *testDB) {
 		ctx := context.Background()
 
-		err := td.dalDB.WithTx(ctx, nil, func(tx *dal.Tx) error {
+		err := td.dalDB.WithTx(ctx, nil, func(tx *xdal.Tx) error {
 			qb := td.dalDB.NewQueryBuilder()
 			query, args, err := qb.Insert("users").
 				Set("name", "WithTxUser").
@@ -55,7 +55,7 @@ func TestWithTxRollbackOnError(t *testing.T) {
 	runForEachDB(t, func(t *testing.T, td *testDB) {
 		ctx := context.Background()
 
-		err := td.dalDB.WithTx(ctx, nil, func(tx *dal.Tx) error {
+		err := td.dalDB.WithTx(ctx, nil, func(tx *xdal.Tx) error {
 			qb := td.dalDB.NewQueryBuilder()
 			query, args, err := qb.Insert("users").
 				Set("name", "RollbackUser").
@@ -94,7 +94,7 @@ func TestWithTxDirectExecution(t *testing.T) {
 	runForEachDB(t, func(t *testing.T, td *testDB) {
 		ctx := context.Background()
 
-		err := td.dalDB.WithTx(ctx, nil, func(tx *dal.Tx) error {
+		err := td.dalDB.WithTx(ctx, nil, func(tx *xdal.Tx) error {
 			qb := td.dalDB.NewQueryBuilder()
 			query, args, err := qb.Insert("users").
 				Set("name", "TxDirUser").
@@ -219,7 +219,7 @@ func TestWithTxUpdateAndVerify(t *testing.T) {
 	runForEachDBWithSeed(t, func(t *testing.T, td *testDB) {
 		ctx := context.Background()
 
-		err := td.dalDB.WithTx(ctx, nil, func(tx *dal.Tx) error {
+		err := td.dalDB.WithTx(ctx, nil, func(tx *xdal.Tx) error {
 			query, args, err := td.builder().Update("users").
 				Set("email", "alice_wtx@example.com").
 				Where("name = ?", "Alice").
