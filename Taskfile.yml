@@ -31,12 +31,12 @@ tasks:
   vet:
     desc: Run go vet
     cmds:
-      - go vet ./...
+      - go vet ./pkg/... ./tests/...
 
   lint:
     desc: Run linter
     cmds:
-      - golangci-lint run
+      - golangci-lint run ./pkg/... ./tests/...
 
   tidy:
     desc: Tidy modules
@@ -51,7 +51,7 @@ tasks:
       - sh: 'git diff --quiet'
         msg: 'working tree has uncommitted changes'
     cmds:
-      - go vet ./...
+      - go vet ./pkg/... ./tests/...
       - go test ./pkg/...
       - git tag {{.CLI_ARGS}}
       - git push origin {{.CLI_ARGS}}
