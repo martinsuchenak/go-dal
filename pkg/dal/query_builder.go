@@ -1,6 +1,10 @@
 package dal
 
-import "fmt"
+import (
+	"fmt"
+	"reflect"
+	"sort"
+)
 
 // QueryBuilder creates SQL queries with the configured Dialect.
 type QueryBuilder struct {
@@ -207,6 +211,38 @@ func (q *InsertQuery) Set(key string, value interface{}) *InsertQuery {
 	return q
 }
 
+// SetMap adds all key-value pairs from a map for a single-row INSERT.
+// Keys are sorted for deterministic SQL output.
+func (q *InsertQuery) SetMap(m map[string]interface{}) *InsertQuery {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		q.keys = append(q.keys, k)
+		q.values = append(q.values, m[k])
+	}
+	return q
+}
+
+// SetStruct adds exported struct fields as column-value pairs for a single-row INSERT.
+// Field names are mapped to column names via struct tags:
+//
+//	type User struct {
+//	    Name  string `db:"name"`
+//	    Email string `db:"email"`
+//	}
+//
+// Untagged fields use the Go field name in lowercase. Unexported fields and
+// fields with `db:"-"` are skipped. Pointer fields with nil values are skipped.
+func (q *InsertQuery) SetStruct(s interface{}) *InsertQuery {
+	keys, vals := structFields(s)
+	q.keys = append(q.keys, keys...)
+	q.values = append(q.values, vals...)
+	return q
+}
+
 // Columns sets the column names for a multi-row INSERT.
 func (q *InsertQuery) Columns(columns ...string) *InsertQuery {
 	q.keys = columns
@@ -238,6 +274,30 @@ func (q *InsertQuery) Build() (string, []interface{}, error) {
 func (q *UpdateQuery) Set(key string, value interface{}) *UpdateQuery {
 	q.keys = append(q.keys, key)
 	q.values = append(q.values, value)
+	return q
+}
+
+// SetMap adds all key-value pairs from a map to the UPDATE statement.
+// Keys are sorted for deterministic SQL output.
+func (q *UpdateQuery) SetMap(m map[string]interface{}) *UpdateQuery {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		q.keys = append(q.keys, k)
+		q.values = append(q.values, m[k])
+	}
+	return q
+}
+
+// SetStruct adds exported struct fields as column-value pairs to the UPDATE statement.
+// See InsertQuery.SetStruct for tag conventions.
+func (q *UpdateQuery) SetStruct(s interface{}) *UpdateQuery {
+	keys, vals := structFields(s)
+	q.keys = append(q.keys, keys...)
+	q.values = append(q.values, vals...)
 	return q
 }
 
@@ -288,4 +348,62 @@ func (q *DeleteQuery) Returning(columns ...string) *DeleteQuery {
 // Build constructs the DELETE SQL string and returns it along with the ordered argument slice.
 func (q *DeleteQuery) Build() (string, []interface{}, error) {
 	return q.dialect.BuildDelete(q)
+}
+
+// --- Struct field reflection ---
+
+func structFields(s interface{}) ([]string, []interface{}) {
+	v := reflect.ValueOf(s)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	t := v.Type()
+
+	var keys []string
+	var vals []interface{}
+
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		if !field.IsExported() {
+			continue
+		}
+
+		tag := field.Tag.Get("db")
+		if tag == "-" {
+			continue
+		}
+
+		colName := tag
+		if colName == "" {
+			colName = toSnakeCase(field.Name)
+		}
+
+		fv := v.Field(i)
+		if fv.Kind() == reflect.Ptr && fv.IsNil() {
+			continue
+		}
+		if fv.Kind() == reflect.Ptr {
+			fv = fv.Elem()
+		}
+
+		keys = append(keys, colName)
+		vals = append(vals, fv.Interface())
+	}
+
+	return keys, vals
+}
+
+func toSnakeCase(s string) string {
+	var result []byte
+	for i, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 {
+				result = append(result, '_')
+			}
+			result = append(result, byte(r+('a'-'A')))
+		} else {
+			result = append(result, byte(r))
+		}
+	}
+	return string(result)
 }

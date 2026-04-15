@@ -214,6 +214,32 @@ query, args, err := qb.Insert("users").
 // INSERT INTO `users` (`name`, `email`) VALUES (?, ?)
 ```
 
+Single row using `SetMap` (keys are sorted for deterministic output):
+
+```go
+query, args, err := qb.Insert("users").
+    SetMap(map[string]interface{}{
+        "name":  "Alice",
+        "email": "alice@example.com",
+    }).
+    Build()
+// INSERT INTO `users` (`email`, `name`) VALUES (?, ?)
+```
+
+Single row using `SetStruct` (reads `db` struct tags, falls back to snake_case):
+
+```go
+type User struct {
+    Name  string `db:"name"`
+    Email string `db:"email"`
+}
+
+query, args, err := qb.Insert("users").
+    SetStruct(User{Name: "Alice", Email: "alice@example.com"}).
+    Build()
+// INSERT INTO `users` (`name`, `email`) VALUES (?, ?)
+```
+
 Multi-row using `Columns` and `Values`:
 
 ```go
@@ -248,6 +274,32 @@ query, args, err := qb.Insert("users").
 query, args, err := qb.Update("users").
     Set("email", "new@example.com").
     Set("active", false).
+    Where("id = ?", 42).
+    Build()
+```
+
+With `SetMap`:
+
+```go
+query, args, err := qb.Update("users").
+    SetMap(map[string]interface{}{
+        "email":  "new@example.com",
+        "active": false,
+    }).
+    Where("id = ?", 42).
+    Build()
+```
+
+With `SetStruct`:
+
+```go
+type UserUpdate struct {
+    Email  string `db:"email"`
+    Active bool   `db:"active"`
+}
+
+query, args, err := qb.Update("users").
+    SetStruct(UserUpdate{Email: "new@example.com", Active: false}).
     Where("id = ?", 42).
     Build()
 ```
@@ -296,6 +348,32 @@ query, args, err := qb.Delete("users").
 // PostgreSQL: DELETE FROM "users" WHERE "active" = $1 RETURNING "id", "name"
 // MSSQL:      DELETE FROM [users] OUTPUT DELETED.[id], DELETED.[name] WHERE [active] = @p1
 ```
+
+### SetStruct Tag Conventions
+
+`SetStruct` reads struct fields using these rules:
+
+| Tag | Behavior |
+|-----|----------|
+| `db:"column_name"` | Use `column_name` as the column |
+| `db:"-"` | Skip this field |
+| *(no tag)* | Use Go field name converted to `snake_case` |
+| *(unexported)* | Always skipped |
+
+Pointer fields with `nil` values are skipped (useful for optional UPDATE columns). Non-nil pointers are dereferenced automatically.
+
+```go
+type User struct {
+    ID        string  `db:"id"`         // column: id
+    FullName  string                     // column: full_name (snake_case)
+    Email     string  `db:"email"`      // column: email
+    Password  string  `db:"-"`          // skipped
+    secret    string                    // skipped (unexported)
+    LockedAt  *string `db:"locked_at"`  // skipped when nil, included when set
+}
+```
+
+`SetMap` and `SetStruct` can be mixed with `Set` calls — they all append to the same column/value list.
 
 ### Executing Queries
 

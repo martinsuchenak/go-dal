@@ -1005,6 +1005,210 @@ func TestInSingleValue(t *testing.T) {
 	assertArgs(t, args, 42)
 }
 
+func TestInsertSetMap(t *testing.T) {
+	qb := NewQueryBuilder(defaultDialect())
+	query, args, err := qb.Insert("users").SetMap(map[string]interface{}{
+		"name":  "Alice",
+		"email": "alice@example.com",
+		"age":   30,
+	}).Build()
+
+	assertNoError(t, err)
+	assertQuery(t, query, "INSERT INTO users (age, email, name) VALUES (?, ?, ?)")
+	assertArgs(t, args, 30, "alice@example.com", "Alice")
+}
+
+func TestUpdateSetMap(t *testing.T) {
+	qb := NewQueryBuilder(defaultDialect())
+	query, args, err := qb.Update("users").
+		SetMap(map[string]interface{}{
+			"email": "new@example.com",
+			"name":  "Alice",
+		}).
+		Where("id = ?", 1).
+		Build()
+
+	assertNoError(t, err)
+	assertQuery(t, query, "UPDATE users SET email = ?, name = ? WHERE id = ?")
+	assertArgs(t, args, "new@example.com", "Alice", 1)
+}
+
+func TestSetMapEmpty(t *testing.T) {
+	qb := NewQueryBuilder(defaultDialect())
+	_, _, err := qb.Insert("users").SetMap(map[string]interface{}{}).Build()
+	if err != ErrEmptyColumns {
+		t.Errorf("got err %v, want ErrEmptyColumns", err)
+	}
+}
+
+func TestSetMapPreservesExistingSet(t *testing.T) {
+	qb := NewQueryBuilder(defaultDialect())
+	query, args, err := qb.Insert("users").
+		Set("id", 1).
+		SetMap(map[string]interface{}{
+			"name":  "Alice",
+			"email": "a@b.com",
+		}).
+		Build()
+
+	assertNoError(t, err)
+	assertQuery(t, query, "INSERT INTO users (id, email, name) VALUES (?, ?, ?)")
+	assertArgs(t, args, 1, "a@b.com", "Alice")
+}
+
+func TestInsertSetStruct(t *testing.T) {
+	type User struct {
+		Name  string `db:"name"`
+		Email string `db:"email"`
+		Age   int    `db:"age"`
+	}
+
+	qb := NewQueryBuilder(defaultDialect())
+	query, args, err := qb.Insert("users").SetStruct(User{
+		Name:  "Alice",
+		Email: "alice@example.com",
+		Age:   30,
+	}).Build()
+
+	assertNoError(t, err)
+	assertQuery(t, query, "INSERT INTO users (name, email, age) VALUES (?, ?, ?)")
+	assertArgs(t, args, "Alice", "alice@example.com", 30)
+}
+
+func TestUpdateSetStruct(t *testing.T) {
+	type UpdateUser struct {
+		Name  string `db:"name"`
+		Email string `db:"email"`
+	}
+
+	qb := NewQueryBuilder(defaultDialect())
+	query, args, err := qb.Update("users").
+		SetStruct(UpdateUser{Name: "Bob", Email: "bob@example.com"}).
+		Where("id = ?", 1).
+		Build()
+
+	assertNoError(t, err)
+	assertQuery(t, query, "UPDATE users SET name = ?, email = ? WHERE id = ?")
+	assertArgs(t, args, "Bob", "bob@example.com", 1)
+}
+
+func TestSetStructPointerInput(t *testing.T) {
+	type User struct {
+		Name string `db:"name"`
+	}
+
+	u := &User{Name: "Alice"}
+	qb := NewQueryBuilder(defaultDialect())
+	query, args, err := qb.Insert("users").SetStruct(u).Build()
+
+	assertNoError(t, err)
+	assertQuery(t, query, "INSERT INTO users (name) VALUES (?)")
+	assertArgs(t, args, "Alice")
+}
+
+func TestSetStructSkipsNilPointers(t *testing.T) {
+	type User struct {
+		Name  string  `db:"name"`
+		Email *string `db:"email"`
+	}
+
+	qb := NewQueryBuilder(defaultDialect())
+	query, args, err := qb.Insert("users").SetStruct(User{
+		Name:  "Alice",
+		Email: nil,
+	}).Build()
+
+	assertNoError(t, err)
+	assertQuery(t, query, "INSERT INTO users (name) VALUES (?)")
+	assertArgs(t, args, "Alice")
+}
+
+func TestSetStructDereferencesNonNilPointers(t *testing.T) {
+	type User struct {
+		Name  string  `db:"name"`
+		Email *string `db:"email"`
+	}
+
+	email := "alice@example.com"
+	qb := NewQueryBuilder(defaultDialect())
+	query, args, err := qb.Insert("users").SetStruct(User{
+		Name:  "Alice",
+		Email: &email,
+	}).Build()
+
+	assertNoError(t, err)
+	assertQuery(t, query, "INSERT INTO users (name, email) VALUES (?, ?)")
+	assertArgs(t, args, "Alice", "alice@example.com")
+}
+
+func TestSetStructSkipsUnexported(t *testing.T) {
+	type User struct {
+		Name   string `db:"name"`
+		secret string
+	}
+
+	qb := NewQueryBuilder(defaultDialect())
+	query, args, err := qb.Insert("users").SetStruct(User{
+		Name:   "Alice",
+		secret: "hidden",
+	}).Build()
+
+	assertNoError(t, err)
+	assertQuery(t, query, "INSERT INTO users (name) VALUES (?)")
+	assertArgs(t, args, "Alice")
+}
+
+func TestSetStructSkipsDashTag(t *testing.T) {
+	type User struct {
+		Name    string `db:"name"`
+		Ignored string `db:"-"`
+	}
+
+	qb := NewQueryBuilder(defaultDialect())
+	query, args, err := qb.Insert("users").SetStruct(User{
+		Name:    "Alice",
+		Ignored: "skip me",
+	}).Build()
+
+	assertNoError(t, err)
+	assertQuery(t, query, "INSERT INTO users (name) VALUES (?)")
+	assertArgs(t, args, "Alice")
+}
+
+func TestSetStructNoTagUsesSnakeCase(t *testing.T) {
+	type User struct {
+		FullName string
+		Email    string
+	}
+
+	qb := NewQueryBuilder(defaultDialect())
+	query, args, err := qb.Insert("users").SetStruct(User{
+		FullName: "Alice Smith",
+		Email:    "alice@example.com",
+	}).Build()
+
+	assertNoError(t, err)
+	assertQuery(t, query, "INSERT INTO users (full_name, email) VALUES (?, ?)")
+	assertArgs(t, args, "Alice Smith", "alice@example.com")
+}
+
+func TestSetStructDollarPlaceholders(t *testing.T) {
+	type User struct {
+		Name  string `db:"name"`
+		Email string `db:"email"`
+	}
+
+	qb := NewQueryBuilder(dollarDialect())
+	query, args, err := qb.Insert("users").SetStruct(User{
+		Name:  "Alice",
+		Email: "alice@example.com",
+	}).Build()
+
+	assertNoError(t, err)
+	assertQuery(t, query, `INSERT INTO users (name, email) VALUES ($1, $2)`)
+	assertArgs(t, args, "Alice", "alice@example.com")
+}
+
 func assertNoError(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {

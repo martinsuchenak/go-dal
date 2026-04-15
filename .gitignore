@@ -4,3 +4,5 @@ bin/
 *.so
 .DS_Store
 .vscode/
+.local/
+tmp/

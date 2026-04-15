@@ -249,6 +249,43 @@ id, _ := result.LastInsertId()
 fmt.Println("inserted id:", id)
 ```
 
+### Insert with SetMap
+
+```go
+query, args, err := qb.Insert("users").
+    SetMap(map[string]interface{}{
+        "name":  "Alice",
+        "email": "alice@example.com",
+        "active": true,
+    }).
+    Build()
+if err != nil {
+    log.Fatal(err)
+}
+// Keys are sorted: INSERT INTO `users` (`active`, `email`, `name`) VALUES (?, ?, ?)
+
+result, err := db.Exec(ctx, query, args...)
+```
+
+### Insert with SetStruct
+
+```go
+type User struct {
+    Name   string `db:"name"`
+    Email  string `db:"email"`
+    Active bool   `db:"active"`
+}
+
+query, args, err := qb.Insert("users").
+    SetStruct(User{Name: "Alice", Email: "alice@example.com", Active: true}).
+    Build()
+if err != nil {
+    log.Fatal(err)
+}
+
+result, err := db.Exec(ctx, query, args...)
+```
+
 ### Batch insert
 
 ```go
@@ -349,6 +386,40 @@ if err != nil {
     log.Fatal(err)
 }
 // UPDATE `users` SET `active` = ? WHERE last_login < ? OR status = ?
+```
+
+### Update with SetMap
+
+```go
+query, args, err := qb.Update("users").
+    SetMap(map[string]interface{}{
+        "email":      "new@example.com",
+        "updated_at": time.Now(),
+    }).
+    Where("id = ?", 1).
+    Build()
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### Update with SetStruct
+
+```go
+type UserUpdate struct {
+    Email     string `db:"email"`
+    UpdatedAt string `db:"updated_at"`
+}
+
+query, args, err := qb.Update("users").
+    SetStruct(UserUpdate{Email: "new@example.com", UpdatedAt: time.Now().Format(time.RFC3339)}).
+    Where("id = ?", 1).
+    Build()
+if err != nil {
+    log.Fatal(err)
+}
+
+result, err := db.Exec(ctx, query, args...)
 ```
 
 ---

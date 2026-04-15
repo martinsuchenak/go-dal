@@ -31,7 +31,7 @@ tests/integration/ Integration tests using Docker containers
 | `Tx` | `pkg/dal/logger.go` | Transaction wrapper with logging |
 | `Dialect` | `pkg/dal/dialect.go` | Interface for SQL generation (returns error). Includes `TranslateSQL` for raw SQL placeholder translation |
 | `BaseDialect` | `pkg/dal/dialect.go` | Common implementation configured by function fields (Placeholder, AppendLimit, AppendReturning, AppendDeletedReturning, PrependReturning) + QuoteStyle |
-| `QueryBuilder` | `pkg/dal/query_builder.go` | Fluent API, delegates Build() to Dialect |
+| `QueryBuilder` | `pkg/dal/query_builder.go` | Fluent API, delegates Build() to Dialect. SetMap/SetStruct for bulk column-value pairs |
 | `SelectQuery` | `pkg/dal/types.go` | Fluent SELECT builder |
 | `InsertQuery` | `pkg/dal/types.go` | Fluent INSERT builder (single-row and batch) |
 | `UpdateQuery` | `pkg/dal/types.go` | Fluent UPDATE builder |
