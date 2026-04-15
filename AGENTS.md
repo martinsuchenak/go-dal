@@ -26,24 +26,26 @@ tests/integration/ Integration tests using Docker containers
 | Type | File | Purpose |
 |------|------|---------|
 | `DBInterface` | `pkg/dal/types.go` | Interface for all drivers (Exec, Query, QueryRow, BeginTx, Ping, Close) |
+| `DBExecutor` | `pkg/dal/logger.go` | Common interface for Exec/Query/QueryRow (satisfied by BaseDB and Tx) |
 | `BaseDB` | `pkg/dal/logger.go` | Shared implementation with structured logging; drivers embed this |
 | `Tx` | `pkg/dal/logger.go` | Transaction wrapper with logging |
-| `Dialect` | `pkg/dal/dialect.go` | Interface for SQL generation |
-| `BaseDialect` | `pkg/dal/dialect.go` | Common implementation configured by PlaceholderStyle + LimitStyle + QuoteStyle |
+| `Dialect` | `pkg/dal/dialect.go` | Interface for SQL generation (returns error) |
+| `BaseDialect` | `pkg/dal/dialect.go` | Common implementation configured by function fields (Placeholder, AppendLimit, AppendReturning, PrependReturning) + QuoteStyle |
 | `QueryBuilder` | `pkg/dal/query_builder.go` | Fluent API, delegates Build() to Dialect |
 | `SelectQuery` | `pkg/dal/types.go` | Fluent SELECT builder |
 | `InsertQuery` | `pkg/dal/types.go` | Fluent INSERT builder (single-row and batch) |
 | `UpdateQuery` | `pkg/dal/types.go` | Fluent UPDATE builder |
 | `DeleteQuery` | `pkg/dal/types.go` | Fluent DELETE builder |
+| `WhereGroup` | `pkg/dal/query_builder.go` | Collects conditions for parenthesized WHERE groups |
 | `Logger` | `pkg/dal/logger.go` | Structured logging interface (compatible with fortix/go-libs/logger) |
 
 ### How Drivers Work
 
-Each driver is ~26 lines: a struct embedding `*dal.BaseDB` (promoting all DBInterface methods), a constructor accepting optional `dal.Logger`, and `NewQueryBuilder()` using the driver's dialect. No forwarding methods — Go embedding handles promotion.
+Each driver is ~27 lines: a struct embedding `*dal.BaseDB` (promoting all DBInterface methods), a constructor accepting `dal.Logger`, and `NewQueryBuilder()` using the driver's dialect. No forwarding methods — Go embedding handles promotion.
 
 ### How Dialects Work
 
-Query structs hold a `Dialect` reference. `Build()` delegates to `dialect.BuildXxx(q)`. `BaseDialect` is configured with three fields (`PlaceholderStyle`, `LimitStyle`, `QuoteStyle`) and handles all four CRUD operations. Drivers can embed `BaseDialect` and override individual methods for database-specific behavior.
+Query structs hold a `Dialect` reference. `Build()` delegates to `dialect.BuildXxx(q)` and returns `(string, []interface{}, error)`. `BaseDialect` is configured entirely via function fields (`Placeholder`, `AppendLimit`, `AppendReturning`, `PrependReturning`) and style flags (`QuoteStyle`, `BackslashEscapes`). Drivers configure hooks in their constructors — no need to override Build methods.
 
 ## Build & Test Commands
 
@@ -92,6 +94,8 @@ SQLite uses in-memory databases (no Docker).
 - Quote-aware placeholder replacement: `?` inside single/double-quoted strings must be skipped
 - Use `t.Run(subtest)` for multi-database integration tests
 - Use ordered slices (not maps) for column/value pairs to ensure deterministic SQL
+- `Build()` returns `(string, []interface{}, error)` — always handle the error
+- `In()` returns `(InValues, error)` — always handle the error
 
 ## Common Tasks
 
@@ -99,14 +103,14 @@ SQLite uses in-memory databases (no Docker).
 
 1. Add field(s) to the query struct in `pkg/dal/types.go`
 2. Add fluent method(s) in `pkg/dal/query_builder.go`
-3. Update `BaseDialect.BuildXxx()` in `pkg/dal/dialect.go`
+3. Update `BaseDialect.BuildXxx()` in `pkg/dal/dialect.go` — return errors for validation
 4. Add unit tests in `pkg/dal/query_builder_test.go`
 5. Add integration tests if the feature interacts with real databases
 
 ### Adding a new database driver
 
-1. Create `pkg/yourdb/yourdb.go` — struct embedding `*dal.BaseDB`, constructor, `NewQueryBuilder`
-2. Create `pkg/yourdb/dialect.go` — `NewDialect()` returning configured `BaseDialect`
+1. Create `pkg/yourdb/yourdb.go` — struct embedding `*dal.BaseDB`, constructor taking `dal.Logger`, `NewQueryBuilder`
+2. Create `pkg/yourdb/dialect.go` — `NewDialect()` returning configured `BaseDialect` with function fields
 3. Add interface compliance test: `var _ dal.DBInterface = (*YourDB)(nil)`
 4. Add unit tests for the driver package
 5. Add Docker service to `docker-compose.test.yml`
@@ -122,17 +126,18 @@ See [docs/contributing.md](docs/contributing.md) for the full guide.
 - MSSQL requires creating the database explicitly after container startup
 - `modernc.org/sqlite` registers as `"sqlite"` not `"sqlite3"`
 - Identifier quoting: MySQL = backticks, PostgreSQL/SQLite = double quotes, MSSQL = brackets
+- MySQL does not support RETURNING — use `LastInsertId()` instead
 
 ## File Map
 
 | File | What to change for |
 |------|-------------------|
-| `pkg/dal/types.go` | New query struct fields, interface changes |
-| `pkg/dal/query_builder.go` | New fluent methods, In() helper |
-| `pkg/dal/dialect.go` | SQL generation, quoting, placeholder translation |
-| `pkg/dal/logger.go` | Logging, Tx wrapper, BaseDB methods |
+| `pkg/dal/types.go` | New query struct fields, interface changes, error vars |
+| `pkg/dal/query_builder.go` | New fluent methods, In() helper, WhereGroup |
+| `pkg/dal/dialect.go` | SQL generation, quoting, placeholder translation, SafeIdentifier |
+| `pkg/dal/logger.go` | Logging, Tx wrapper, BaseDB methods, DBExecutor, WithTx |
 | `pkg/*/yourdb.go` | Driver constructor, NewQueryBuilder |
-| `pkg/*/dialect.go` | Driver-specific dialect config |
+| `pkg/*/dialect.go` | Driver-specific dialect config (function fields) |
 | `tests/integration/helpers.go` | Database connection setup, schema, seed data |
 | `tests/integration/*.go` | Integration test cases |
 | `docker-compose.test.yml` | Test database containers |

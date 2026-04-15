@@ -2,7 +2,7 @@
 
 ## Creating a Database Connection
 
-Each driver wraps a standard `*sql.DB` and optionally accepts a logger:
+Each driver wraps a standard `*sql.DB` and accepts a `dal.Logger` (pass `nil` to disable logging):
 
 ```go
 import (
@@ -13,8 +13,8 @@ import (
 
 sqlDB, _ := sql.Open("mysql", "user:pass@tcp(localhost:3306)/mydb")
 
-// Silent (default)
-db := mysql.NewMySQLDB(sqlDB)
+// Silent (no logging)
+db := mysql.NewMySQLDB(sqlDB, nil)
 
 // With logging
 db := mysql.NewMySQLDB(sqlDB, myLogger)
@@ -23,10 +23,10 @@ db := mysql.NewMySQLDB(sqlDB, myLogger)
 All drivers follow the same pattern:
 
 ```go
-mysql.NewMySQLDB(sqlDB, logger...)
-postgres.NewPostgresDB(sqlDB, logger...)
-sqlite.NewSQLiteDB(sqlDB, logger...)
-mssql.NewMSSQLDB(sqlDB, logger...)
+mysql.NewMySQLDB(sqlDB, logger)
+postgres.NewPostgresDB(sqlDB, logger)
+sqlite.NewSQLiteDB(sqlDB, logger)
+mssql.NewMSSQLDB(sqlDB, logger)
 ```
 
 ### Health Check
@@ -59,17 +59,19 @@ You can also construct one directly if needed:
 import "github.com/martinsuchenak/go-dal/pkg/dal"
 
 d := &dal.BaseDialect{
-    PlaceholderStyle: dal.QuestionMark,
-    LimitStyle:       dal.LimitOffsetStyle,
-    QuoteStyle:       dal.BacktickQuoting,
+    Placeholder: dal.QuestionMarkPlaceholder,
+    AppendLimit: dal.LimitOffset,
+    QuoteStyle:  dal.BacktickQuoting,
 }
+// Enable RETURNING (optional):
+// d.AppendReturning = d.WriteReturning
 qb := dal.NewQueryBuilder(d)
 ```
 
 ### SELECT
 
 ```go
-query, args := qb.Select("id", "name", "email").
+query, args, err := qb.Select("id", "name", "email").
     From("users").
     Where("active = ?", true).
     OrderBy("name").
@@ -81,13 +83,13 @@ query, args := qb.Select("id", "name", "email").
 For `SELECT *`:
 
 ```go
-query, args := qb.SelectAll().From("users").Build()
+query, args, err := qb.SelectAll().From("users").Build()
 ```
 
 For `SELECT DISTINCT`:
 
 ```go
-query, args := qb.Select("name").Distinct().From("users").Build()
+query, args, err := qb.Select("name").Distinct().From("users").Build()
 ```
 
 ### WHERE Clauses
@@ -113,19 +115,63 @@ qb.Where("a = ?", 1).OrWhere("b = ?", 2).Where("c = ?", 3)
 // WHERE a = ? OR b = ? AND c = ?
 ```
 
+### WHERE Groups
+
+Use `WhereGroup` to create parenthesized groups of conditions:
+
+```go
+qb.Where("active = ?", true).
+    WhereGroup(func(g *dal.WhereGroup) {
+        g.Where("role = ?", "admin").OrWhere("role = ?", "moderator")
+    })
+// WHERE active = ? AND (role = ? OR role = ?)
+```
+
+Use `OrWhereGroup` to combine a group with OR:
+
+```go
+qb.Where("a = ?", 1).
+    OrWhereGroup(func(g *dal.WhereGroup) {
+        g.Where("b = ?", 2).Where("c = ?", 3)
+    })
+// WHERE a = ? OR (b = ? AND c = ?)
+```
+
+### WHERE Shortcuts
+
+```go
+// IS NULL
+qb.WhereIsNull("deleted_at")
+// WHERE deleted_at IS NULL
+
+// IS NOT NULL
+qb.WhereIsNotNull("email")
+// WHERE email IS NOT NULL
+
+// BETWEEN
+qb.WhereBetween("age", 18, 65)
+// WHERE age BETWEEN ? AND ?  with args [18, 65]
+```
+
 ### IN Clause
 
 Use `dal.In()` to expand a single placeholder into multiple values:
 
 ```go
-qb.Where("id IN (?)", dal.In(1, 2, 3))
+inVals, err := dal.In(1, 2, 3)
+if err != nil {
+    return err
+}
+qb.Where("id IN (?)", inVals)
 // WHERE id IN (?, ?, ?) with args [1, 2, 3]
 ```
+
+`In()` returns an error if no values are provided or if the count exceeds 1000 (`dal.MaxInValues`).
 
 ### JOINs
 
 ```go
-qb.Select("u.name", "o.total").
+query, args, err := qb.Select("u.name", "o.total").
     From("users u").
     Join("INNER JOIN orders o ON o.user_id = u.id").
     Where("o.total > ?", 100).
@@ -142,11 +188,18 @@ qb.Join("INNER JOIN orders o ON o.user_id = u.id").
 ### GROUP BY and HAVING
 
 ```go
-qb.Select("active", "COUNT(*) as cnt").
+query, args, err := qb.Select("active", "COUNT(*) as cnt").
     From("users").
     GroupBy("active").
     Having("COUNT(*) > ?", 1).
     Build()
+```
+
+Use `OrHaving` for OR conditions in the HAVING clause:
+
+```go
+qb.Having("COUNT(*) > ?", 10).OrHaving("AVG(score) < ?", 5)
+// HAVING COUNT(*) > ? OR AVG(score) < ?
 ```
 
 ### INSERT
@@ -154,7 +207,7 @@ qb.Select("active", "COUNT(*) as cnt").
 Single row using `Set`:
 
 ```go
-query, args := qb.Insert("users").
+query, args, err := qb.Insert("users").
     Set("name", "Alice").
     Set("email", "alice@example.com").
     Build()
@@ -164,7 +217,7 @@ query, args := qb.Insert("users").
 Multi-row using `Columns` and `Values`:
 
 ```go
-query, args := qb.Insert("users").
+query, args, err := qb.Insert("users").
     Columns("name", "email").
     Values("Alice", "alice@example.com").
     Values("Bob", "bob@example.com").
@@ -175,33 +228,49 @@ query, args := qb.Insert("users").
 
 ### INSERT RETURNING
 
-For PostgreSQL (`RETURNING`) and SQL Server (`OUTPUT INSERTED.*`):
+For PostgreSQL (`RETURNING`), SQLite (`RETURNING`), and SQL Server (`OUTPUT INSERTED.*`):
 
 ```go
-query, args := qb.Insert("users").
+query, args, err := qb.Insert("users").
     Set("name", "Alice").
     Returning("id").
     Build()
 
-// PostgreSQL: INSERT INTO "users" ("name") VALUES ($1) RETURNING id
-// MSSQL:      INSERT INTO [users] ([name]) VALUES (@p1) OUTPUT INSERTED.[id]
-// MySQL:      INSERT INTO `users` (`name`) VALUES (?)  (no-op, use LastInsertId)
+// PostgreSQL: INSERT INTO "users" ("name") VALUES ($1) RETURNING "id"
+// SQLite:     INSERT INTO "users" ("name") VALUES (?) RETURNING "id"
+// MSSQL:      INSERT INTO [users] ([name]) OUTPUT INSERTED.[id] VALUES (@p1)
+// MySQL:      returns ErrReturningNotSupported (use LastInsertId instead)
 ```
 
 ### UPDATE
 
 ```go
-query, args := qb.Update("users").
+query, args, err := qb.Update("users").
     Set("email", "new@example.com").
     Set("active", false).
     Where("id = ?", 42).
     Build()
 ```
 
+### UPDATE RETURNING
+
+For PostgreSQL, SQLite, and SQL Server, use `Returning()` on UPDATE:
+
+```go
+query, args, err := qb.Update("users").
+    Set("email", "new@example.com").
+    Where("id = ?", 42).
+    Returning("id", "email").
+    Build()
+
+// PostgreSQL: UPDATE "users" SET "email" = $1 WHERE "id" = $2 RETURNING "id", "email"
+// MSSQL:      UPDATE [users] SET [email] = @p1 OUTPUT INSERTED.[id], INSERTED.[email] WHERE [id] = @p2
+```
+
 ### DELETE
 
 ```go
-query, args := qb.Delete("users").
+query, args, err := qb.Delete("users").
     Where("active = ?", false).
     OrWhere("last_login < ?", "2020-01-01").
     Build()
@@ -210,15 +279,32 @@ query, args := qb.Delete("users").
 Delete all rows (no WHERE):
 
 ```go
-query, args := qb.Delete("users").Build()
+query, args, err := qb.Delete("users").Build()
 // DELETE FROM `users`
+```
+
+### DELETE RETURNING
+
+For PostgreSQL, SQLite, and SQL Server, use `Returning()` on DELETE:
+
+```go
+query, args, err := qb.Delete("users").
+    Where("active = ?", false).
+    Returning("id", "name").
+    Build()
+
+// PostgreSQL: DELETE FROM "users" WHERE "active" = $1 RETURNING "id", "name"
+// MSSQL:      DELETE FROM [users] OUTPUT DELETED.[id], DELETED.[name] WHERE [active] = @p1
 ```
 
 ### Executing Queries
 
 ```go
-// Query builder produces (string, []interface{})
-query, args := qb.Select("name").From("users").Where("id = ?", 1).Build()
+// Query builder produces (string, []interface{}, error)
+query, args, err := qb.Select("name").From("users").Where("id = ?", 1).Build()
+if err != nil {
+    return err
+}
 
 // Execute
 rows, err := db.Query(ctx, query, args...)
@@ -231,15 +317,34 @@ for rows.Next() {
 }
 
 // Single row
-err := db.QueryRow(ctx, query, args...).Scan(&name)
+err = db.QueryRow(ctx, query, args...).Scan(&name)
 
 // Write operations
 result, err := db.Exec(ctx, query, args...)
 ```
 
+### Using DBExecutor
+
+Both `BaseDB` and `Tx` satisfy the `DBExecutor` interface, so you can write functions that work with either:
+
+```go
+func getUser(ctx context.Context, db dal.DBExecutor, id int) (string, error) {
+    qb := mysql.NewQueryBuilder()
+    query, args, err := qb.Select("name").From("users").Where("id = ?", id).Build()
+    if err != nil {
+        return "", err
+    }
+    var name string
+    err = db.QueryRow(ctx, query, args...).Scan(&name)
+    return name, err
+}
+```
+
 ---
 
 ## Transactions
+
+### Manual Transactions
 
 `BeginTx` returns a `*dal.Tx` wrapper with logging. Use `tx.Exec`, `tx.Query`, `tx.QueryRow` instead of the raw `*sql.Tx` methods:
 
@@ -257,6 +362,24 @@ if err := tx.Commit(); err != nil {
     log.Fatal(err)
 }
 ```
+
+### WithTx Helper
+
+`WithTx` handles begin/commit/rollback automatically:
+
+```go
+err := db.WithTx(ctx, nil, func(tx *dal.Tx) error {
+    if _, err := tx.Exec(ctx, "INSERT INTO users (name) VALUES (?)", "Alice"); err != nil {
+        return err
+    }
+    if _, err := tx.Exec(ctx, "INSERT INTO users (name) VALUES (?)", "Bob"); err != nil {
+        return err
+    }
+    return nil
+})
+```
+
+If the callback returns an error, the transaction is rolled back. If it returns `nil`, the transaction is committed.
 
 ---
 
@@ -290,6 +413,14 @@ db.SetLogger(anotherLogger)
 db.SetLogger(nil)
 ```
 
+### Controlling Argument Logging
+
+By default, query arguments are **redacted** in log output (shown as `<redacted>`). To include actual values:
+
+```go
+db.SetLogArgs(true)
+```
+
 ### What Gets Logged
 
 | Operation | Level | Fields |
@@ -319,11 +450,12 @@ The query builder delegates SQL generation to a `Dialect` interface:
 
 ```go
 type Dialect interface {
-    BuildSelect(q *SelectQuery) (string, []interface{})
-    BuildInsert(q *InsertQuery) (string, []interface{})
-    BuildUpdate(q *UpdateQuery) (string, []interface{})
-    BuildDelete(q *DeleteQuery) (string, []interface{})
+    BuildSelect(q *SelectQuery) (string, []interface{}, error)
+    BuildInsert(q *InsertQuery) (string, []interface{}, error)
+    BuildUpdate(q *UpdateQuery) (string, []interface{}, error)
+    BuildDelete(q *DeleteQuery) (string, []interface{}, error)
     QuoteIdentifier(name string) string
+    SupportsReturning() bool
 }
 ```
 
@@ -331,25 +463,43 @@ Each query struct holds a `Dialect` reference. When you call `Build()`, it forwa
 
 ### BaseDialect
 
-`BaseDialect` handles the common case via three configuration fields:
+`BaseDialect` handles the common case via configurable function fields and style flags:
 
 ```go
 type BaseDialect struct {
-    PlaceholderStyle PlaceholderStyle  // QuestionMark, DollarNumber, AtPNumber
-    LimitStyle       LimitStyle        // LimitOffsetStyle, FetchNextStyle
-    QuoteStyle       QuoteStyle        // NoQuoting, BacktickQuoting, DoubleQuoteQuoting, BracketQuoting
+    Placeholder       func(idx int) string                                           // e.g. QuestionMarkPlaceholder
+    AppendLimit       func(b *strings.Builder, orderBy []string, limit, offset *int64) // e.g. LimitOffset
+    AppendReturning   func(b *strings.Builder, columns []string)                     // e.g. d.WriteReturning
+    PrependReturning  func(b *strings.Builder, columns []string)                     // e.g. d.WriteOutput
+    QuoteStyle        QuoteStyle                                                     // BacktickQuoting, DoubleQuoteQuoting, etc.
+    BackslashEscapes  bool                                                           // true for MySQL
 }
 ```
 
-### Placeholder Translation
+Set RETURNING hooks after construction (can't reference methods in struct literal):
+
+```go
+// PostgreSQL/SQLite
+d := &dal.BaseDialect{...}
+d.AppendReturning = d.WriteReturning
+
+// MSSQL
+d := &dal.BaseDialect{...}
+d.PrependReturning = d.WriteOutput   // INSERT: OUTPUT before VALUES
+d.AppendReturning = d.WriteOutput    // UPDATE/DELETE: OUTPUT after WHERE
+
+// MySQL — don't set any returning hooks
+```
+
+### Placeholder Functions
 
 Write queries using `?` regardless of the database. The dialect translates:
 
-| Dialect | Input | Output |
-|---------|-------|--------|
-| MySQL / SQLite | `WHERE id = ?` | `WHERE id = ?` |
-| PostgreSQL | `WHERE id = ?` | `WHERE id = $1` |
-| SQL Server | `WHERE id = ?` | `WHERE id = @p1` |
+| Function | Dialect | Input | Output |
+|----------|---------|-------|--------|
+| `QuestionMarkPlaceholder` | MySQL / SQLite | `WHERE id = ?` | `WHERE id = ?` |
+| `DollarPlaceholder` | PostgreSQL | `WHERE id = ?` | `WHERE id = $1` |
+| `AtPPlaceholder` | SQL Server | `WHERE id = ?` | `WHERE id = @p1` |
 
 Placeholder numbering is automatic and correct across multiple WHERE/HAVING clauses.
 
@@ -374,10 +524,29 @@ Quoting is skipped for expressions containing spaces, parentheses, commas, or `A
 
 ### LIMIT/OFFSET Handling
 
-| LimitStyle | Generated SQL |
-|------------|---------------|
-| LimitOffsetStyle | `LIMIT 10 OFFSET 20` |
-| FetchNextStyle | `OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY` |
+| Function | Generated SQL |
+|----------|---------------|
+| `LimitOffset` | `LIMIT 10 OFFSET 20` |
+| `FetchNextLimit` | `OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY` |
+
+### RETURNING/OUTPUT Handling
+
+| Hook | Dialects | INSERT | UPDATE/DELETE |
+|------|----------|--------|---------------|
+| none | MySQL | not supported | not supported |
+| `AppendReturning = WriteReturning` | PostgreSQL, SQLite | `... VALUES (...) RETURNING col` | `... WHERE ... RETURNING col` |
+| `PrependReturning = WriteOutput` | SQL Server | `... OUTPUT INSERTED.col VALUES (...)` | — |
+| `AppendReturning = WriteOutput` | SQL Server | — | `... WHERE ... OUTPUT INSERTED.col` |
+
+### SafeIdentifier
+
+Use `dal.SafeIdentifier()` to validate that a table or column name is safe (letters, digits, underscores, dots only):
+
+```go
+if err := dal.SafeIdentifier(userInput); err != nil {
+    return fmt.Errorf("invalid identifier: %w", err)
+}
+```
 
 ---
 

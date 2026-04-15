@@ -3,11 +3,11 @@ package mysql
 import "github.com/martinsuchenak/go-dal/pkg/dal"
 
 // NewDialect returns a Dialect configured for MySQL.
-// MySQL uses backslash escapes by default (e.g., \' inside strings).
+// MySQL does not support RETURNING — neither hook is set.
 func NewDialect() dal.Dialect {
 	return &dal.BaseDialect{
-		PlaceholderStyle: dal.QuestionMark,
-		LimitStyle:       dal.LimitOffsetStyle,
+		Placeholder:      dal.QuestionMarkPlaceholder,
+		AppendLimit:      dal.LimitOffset,
 		QuoteStyle:       dal.BacktickQuoting,
 		BackslashEscapes: true,
 	}

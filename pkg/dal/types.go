@@ -24,18 +24,6 @@ type DBInterface interface {
 	Close() error
 }
 
-// PlaceholderStyle represents the SQL parameter placeholder format used by a database driver.
-type PlaceholderStyle int
-
-const (
-	// QuestionMark uses "?" placeholders (MySQL, SQLite).
-	QuestionMark PlaceholderStyle = iota
-	// DollarNumber uses "$1, $2, ..." placeholders (PostgreSQL).
-	DollarNumber
-	// AtPNumber uses "@p1, @p2, ..." placeholders (SQL Server).
-	AtPNumber
-)
-
 var (
 	// ErrEmptyTable is returned by Build when no table name is set.
 	ErrEmptyTable = errors.New("dal: table name is required")

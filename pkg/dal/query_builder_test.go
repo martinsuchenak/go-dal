@@ -5,15 +5,22 @@ import (
 )
 
 func defaultDialect() Dialect {
-	return &BaseDialect{PlaceholderStyle: QuestionMark, LimitStyle: LimitOffsetStyle, BackslashEscapes: true}
+	d := &BaseDialect{Placeholder: QuestionMarkPlaceholder, AppendLimit: LimitOffset, BackslashEscapes: true}
+	d.AppendReturning = d.WriteReturning
+	return d
 }
 
 func dollarDialect() Dialect {
-	return &BaseDialect{PlaceholderStyle: DollarNumber, LimitStyle: LimitOffsetStyle}
+	d := &BaseDialect{Placeholder: DollarPlaceholder, AppendLimit: LimitOffset}
+	d.AppendReturning = d.WriteReturning
+	return d
 }
 
 func atPDialect() Dialect {
-	return &BaseDialect{PlaceholderStyle: AtPNumber, LimitStyle: FetchNextStyle}
+	d := &BaseDialect{Placeholder: AtPPlaceholder, AppendLimit: FetchNextLimit}
+	d.PrependReturning = d.WriteOutput
+	d.AppendReturning = d.WriteOutput
+	return d
 }
 
 func TestSelectBasic(t *testing.T) {
@@ -329,7 +336,7 @@ func TestDollarDeleteWithQuotedPlaceholder(t *testing.T) {
 }
 
 func TestBackslashEscapesSkipsQuoted(t *testing.T) {
-	d := &BaseDialect{PlaceholderStyle: QuestionMark, LimitStyle: LimitOffsetStyle, BackslashEscapes: true}
+	d := &BaseDialect{Placeholder: QuestionMarkPlaceholder, AppendLimit: LimitOffset, BackslashEscapes: true}
 	qb := NewQueryBuilder(d)
 	query, args, err := qb.Select("id").
 		From("users").
@@ -680,8 +687,15 @@ func TestInsertReturningDollar(t *testing.T) {
 	assertArgs(t, args, "Alice")
 }
 
+func newAtPDialectWithQuoting() *BaseDialect {
+	d := &BaseDialect{Placeholder: AtPPlaceholder, AppendLimit: FetchNextLimit, QuoteStyle: BracketQuoting}
+	d.PrependReturning = d.WriteOutput
+	d.AppendReturning = d.WriteOutput
+	return d
+}
+
 func TestInsertReturningAtP(t *testing.T) {
-	d := &BaseDialect{PlaceholderStyle: AtPNumber, LimitStyle: FetchNextStyle, QuoteStyle: BracketQuoting}
+	d := newAtPDialectWithQuoting()
 	qb := NewQueryBuilder(d)
 	query, args, err := qb.Insert("users").
 		Set("name", "Alice").
@@ -818,7 +832,7 @@ func TestUpdateReturningDollar(t *testing.T) {
 }
 
 func TestUpdateReturningAtP(t *testing.T) {
-	d := &BaseDialect{PlaceholderStyle: AtPNumber, LimitStyle: FetchNextStyle, QuoteStyle: BracketQuoting}
+	d := newAtPDialectWithQuoting()
 	qb := NewQueryBuilder(d)
 	query, args, err := qb.Update("users").
 		Set("name", "Alice").
@@ -844,7 +858,7 @@ func TestDeleteReturningDollar(t *testing.T) {
 }
 
 func TestDeleteReturningAtP(t *testing.T) {
-	d := &BaseDialect{PlaceholderStyle: AtPNumber, LimitStyle: FetchNextStyle, QuoteStyle: BracketQuoting}
+	d := newAtPDialectWithQuoting()
 	qb := NewQueryBuilder(d)
 	query, args, err := qb.Delete("users").
 		Where("id = ?", 1).

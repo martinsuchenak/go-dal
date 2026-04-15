@@ -6,29 +6,49 @@ import (
 	"strings"
 )
 
-// LimitStyle determines how LIMIT/OFFSET is rendered in SELECT queries.
-type LimitStyle int
-
-const (
-	// LimitOffsetStyle uses "LIMIT X OFFSET Y" syntax (MySQL, PostgreSQL, SQLite).
-	LimitOffsetStyle LimitStyle = iota
-	// FetchNextStyle uses "OFFSET X ROWS FETCH NEXT Y ROWS ONLY" syntax (SQL Server).
-	FetchNextStyle
-)
-
 // QuoteStyle determines how identifiers are quoted.
 type QuoteStyle int
 
 const (
-	// NoQuoting leaves identifiers as-is.
-	NoQuoting QuoteStyle = iota
-	// BacktickQuoting uses `name` (MySQL).
-	BacktickQuoting
-	// DoubleQuoteQuoting uses "name" (PostgreSQL, SQLite).
-	DoubleQuoteQuoting
-	// BracketQuoting uses [name] (MSSQL).
-	BracketQuoting
+	NoQuoting          QuoteStyle = iota
+	BacktickQuoting               // `name` — MySQL
+	DoubleQuoteQuoting            // "name" — PostgreSQL, SQLite
+	BracketQuoting                // [name] — MSSQL
 )
+
+// QuestionMarkPlaceholder returns "?" for all indices (MySQL, SQLite).
+func QuestionMarkPlaceholder(int) string { return "?" }
+
+// DollarPlaceholder returns "$1", "$2", ... for PostgreSQL.
+func DollarPlaceholder(idx int) string { return fmt.Sprintf("$%d", idx) }
+
+// AtPPlaceholder returns "@p1", "@p2", ... for SQL Server.
+func AtPPlaceholder(idx int) string { return fmt.Sprintf("@p%d", idx) }
+
+// LimitOffset appends "LIMIT X OFFSET Y" to the query (MySQL, PostgreSQL, SQLite).
+func LimitOffset(b *strings.Builder, _ []string, limit, offset *int64) {
+	if limit != nil {
+		fmt.Fprintf(b, " LIMIT %d", *limit)
+	}
+	if offset != nil {
+		fmt.Fprintf(b, " OFFSET %d", *offset)
+	}
+}
+
+// FetchNextLimit appends "OFFSET X ROWS FETCH NEXT Y ROWS ONLY" (SQL Server).
+func FetchNextLimit(b *strings.Builder, orderBy []string, limit, offset *int64) {
+	if len(orderBy) == 0 {
+		b.WriteString(" ORDER BY (SELECT NULL)")
+	}
+	if offset != nil {
+		fmt.Fprintf(b, " OFFSET %d ROWS", *offset)
+	} else {
+		b.WriteString(" OFFSET 0 ROWS")
+	}
+	if limit != nil {
+		fmt.Fprintf(b, " FETCH NEXT %d ROWS ONLY", *limit)
+	}
+}
 
 // Dialect abstracts database-specific SQL generation. Each supported database
 // provides its own Dialect implementation.
@@ -42,36 +62,62 @@ type Dialect interface {
 }
 
 // BaseDialect provides a common SQL generation implementation that covers
-// MySQL, PostgreSQL, SQLite, and SQL Server. Embed and override methods for
-// databases with additional quirks.
+// MySQL, PostgreSQL, SQLite, and SQL Server. Drivers configure behavior via
+// function fields — no need to override Build methods unless introducing a
+// genuinely novel SQL variant.
+//
+// Configure via struct literal, selecting the appropriate helper functions:
+//
+//	&dal.BaseDialect{
+//	    Placeholder: dal.DollarPlaceholder,
+//	    AppendLimit: dal.LimitOffset,
+//	    QuoteStyle:  dal.DoubleQuoteQuoting,
+//	}
+//
+// For RETURNING support, set hooks using the dialect's own formatting methods:
+//
+//	d.AppendReturning = d.WriteReturning  // PostgreSQL/SQLite
+//	// or: d.PrependReturning = d.WriteOutput  // MSSQL
 type BaseDialect struct {
-	PlaceholderStyle PlaceholderStyle
-	LimitStyle       LimitStyle
-	QuoteStyle       QuoteStyle
+	// Placeholder formats a parameter placeholder for the given 1-based index.
+	// Use QuestionMarkPlaceholder, DollarPlaceholder, or AtPPlaceholder.
+	Placeholder func(idx int) string
+
+	// AppendLimit appends the LIMIT/OFFSET (or equivalent) clause.
+	// Use LimitOffset or FetchNextLimit, or provide a custom implementation.
+	AppendLimit func(b *strings.Builder, orderBy []string, limit, offset *int64)
+
+	// QuoteStyle controls identifier quoting (backticks, double quotes, brackets).
+	QuoteStyle QuoteStyle
+
+	// BackslashEscapes enables handling of \' and \" inside string literals (MySQL).
 	BackslashEscapes bool
+
+	// AppendReturning appends a RETURNING clause after the VALUES clause (PostgreSQL, SQLite)
+	// or after the WHERE clause in UPDATE/DELETE. Set to d.WriteReturning for PostgreSQL-style
+	// dialects, d.WriteOutput for MSSQL, or nil for databases that don't support it (MySQL).
+	AppendReturning func(b *strings.Builder, columns []string)
+
+	// PrependReturning inserts a returning clause before the VALUES clause in INSERT.
+	// Set to d.WriteOutput for MSSQL, or nil for other databases.
+	PrependReturning func(b *strings.Builder, columns []string)
 }
 
-// SupportsReturning returns true for dialects that support RETURNING/OUTPUT clauses.
+// SupportsReturning returns true when any returning hook is configured.
 func (d *BaseDialect) SupportsReturning() bool {
-	return d.PlaceholderStyle == DollarNumber || d.PlaceholderStyle == AtPNumber || d.PlaceholderStyle == QuestionMark
+	return d.AppendReturning != nil || d.PrependReturning != nil
 }
 
-func (d *BaseDialect) placeholder(idx int) string {
-	switch d.PlaceholderStyle {
-	case DollarNumber:
-		return fmt.Sprintf("$%d", idx)
-	case AtPNumber:
-		return fmt.Sprintf("@p%d", idx)
-	default:
-		return "?"
-	}
+// isQuestionMark returns true when the placeholder function produces bare "?".
+func (d *BaseDialect) isQuestionMark() bool {
+	return d.Placeholder(1) == "?"
 }
 
-// replaceAndCount replaces unquoted '?' characters with numbered placeholders
-// starting at startIdx, returning the replaced string and the number of
-// placeholders that were substituted.
+// replaceAndCount replaces unquoted '?' characters with dialect-specific
+// placeholders starting at startIdx. Returns the replaced string and the
+// number of placeholders substituted.
 func (d *BaseDialect) replaceAndCount(sql string, startIdx int) (string, int) {
-	if d.PlaceholderStyle == QuestionMark {
+	if d.isQuestionMark() {
 		return sql, countUnquoted(sql, d.BackslashEscapes)
 	}
 
@@ -84,7 +130,6 @@ func (d *BaseDialect) replaceAndCount(sql string, startIdx int) (string, int) {
 
 	for i := 0; i < len(sql); i++ {
 		ch := sql[i]
-
 		switch {
 		case inSingle:
 			if d.BackslashEscapes && ch == '\\' {
@@ -129,23 +174,21 @@ func (d *BaseDialect) replaceAndCount(sql string, startIdx int) (string, int) {
 			b.WriteByte(ch)
 			inDouble = true
 		case ch == '?':
-			b.WriteString(d.placeholder(idx))
+			b.WriteString(d.Placeholder(idx))
 			idx++
 			count++
 		default:
 			b.WriteByte(ch)
 		}
 	}
-
 	return b.String(), count
 }
 
-// countUnquoted counts '?' characters that are NOT inside quoted strings.
+// countUnquoted counts '?' characters not inside quoted strings.
 func countUnquoted(sql string, backslashEscapes bool) int {
 	count := 0
 	inSingle := false
 	inDouble := false
-
 	for i := 0; i < len(sql); i++ {
 		ch := sql[i]
 		switch {
@@ -184,9 +227,7 @@ func countUnquoted(sql string, backslashEscapes bool) int {
 	return count
 }
 
-// buildClauses renders a slice of whereClauses into a joined string, tracking
-// the placeholder index and collecting args. InValues args are expanded.
-// Supports WhereGroup nesting via groupConnector.
+// buildClauses renders whereClauses into a joined string, expanding InValues.
 func (d *BaseDialect) buildClauses(clauses []whereClause, paramIdx int, args []interface{}) (string, int, []interface{}, error) {
 	parts := make([]string, len(clauses))
 	for i, w := range clauses {
@@ -211,7 +252,6 @@ func (d *BaseDialect) buildClauses(clauses []whereClause, paramIdx int, args []i
 
 		condition := w.condition
 		var expandedArgs []interface{}
-
 		for _, arg := range w.args {
 			if in, ok := arg.(InValues); ok {
 				if len(in) == 0 {
@@ -237,17 +277,15 @@ func (d *BaseDialect) buildClauses(clauses []whereClause, paramIdx int, args []i
 			result += " " + p
 		}
 	}
-
 	return result, paramIdx, args, nil
 }
 
-// expandInPlaceholders replaces the first unquoted "?" with N "?" placeholders for IN expansion.
+// expandInPlaceholders replaces the first unquoted "?" with N placeholders.
 func expandInPlaceholders(condition string, count int) string {
 	idx := findFirstUnquotedPlaceholder(condition)
 	if idx == -1 {
 		return condition
 	}
-
 	var b strings.Builder
 	b.Grow(len(condition) + count*3)
 	b.WriteString(condition[:idx])
@@ -261,10 +299,8 @@ func expandInPlaceholders(condition string, count int) string {
 	return b.String()
 }
 
-// findFirstUnquotedPlaceholder finds the index of the first ? not inside quotes.
 func findFirstUnquotedPlaceholder(s string) int {
-	inSingle := false
-	inDouble := false
+	inSingle, inDouble := false, false
 	for i := 0; i < len(s); i++ {
 		ch := s[i]
 		switch {
@@ -296,12 +332,11 @@ func findFirstUnquotedPlaceholder(s string) int {
 }
 
 // QuoteIdentifier wraps an identifier with the dialect's quoting style.
-// Skips quoting for expressions containing "(", "AS", spaces (aliases), or "*".
+// Skips quoting for expressions containing "(", "AS", spaces, commas, or "*".
 func (d *BaseDialect) QuoteIdentifier(name string) string {
 	if name == "" || name == "*" {
 		return name
 	}
-
 	if strings.Contains(name, "(") ||
 		strings.Contains(name, " AS ") ||
 		strings.Contains(name, " as ") ||
@@ -309,7 +344,6 @@ func (d *BaseDialect) QuoteIdentifier(name string) string {
 		strings.Contains(name, ",") {
 		return name
 	}
-
 	if strings.Contains(name, ".") {
 		parts := strings.Split(name, ".")
 		quoted := make([]string, len(parts))
@@ -318,7 +352,6 @@ func (d *BaseDialect) QuoteIdentifier(name string) string {
 		}
 		return strings.Join(quoted, ".")
 	}
-
 	return d.quoteSingle(name)
 }
 
@@ -335,7 +368,6 @@ func (d *BaseDialect) quoteSingle(name string) string {
 	}
 }
 
-// quoteColumns joins and optionally quotes column names.
 func (d *BaseDialect) quoteColumns(columns []string) string {
 	quoted := make([]string, len(columns))
 	for i, c := range columns {
@@ -343,6 +375,34 @@ func (d *BaseDialect) quoteColumns(columns []string) string {
 	}
 	return strings.Join(quoted, ", ")
 }
+
+// --- RETURNING helpers ---
+
+// WriteReturning appends " RETURNING col1, col2" using the dialect's identifier quoting.
+// Use as: d.AppendReturning = d.WriteReturning
+func (d *BaseDialect) WriteReturning(b *strings.Builder, columns []string) {
+	quoted := make([]string, len(columns))
+	for i, c := range columns {
+		quoted[i] = d.QuoteIdentifier(c)
+	}
+	b.WriteString(" RETURNING ")
+	b.WriteString(strings.Join(quoted, ", "))
+}
+
+// WriteOutput appends " OUTPUT INSERTED.col1, INSERTED.col2" using the dialect's quoting.
+// Use as: d.PrependReturning = d.WriteOutput  (for INSERT)
+//
+//	or: d.AppendReturning = d.WriteOutput   (for UPDATE/DELETE)
+func (d *BaseDialect) WriteOutput(b *strings.Builder, columns []string) {
+	quoted := make([]string, len(columns))
+	for i, c := range columns {
+		quoted[i] = "INSERTED." + d.QuoteIdentifier(c)
+	}
+	b.WriteString(" OUTPUT ")
+	b.WriteString(strings.Join(quoted, ", "))
+}
+
+// --- Build methods ---
 
 func (d *BaseDialect) BuildSelect(q *SelectQuery) (string, []interface{}, error) {
 	if q.table == "" {
@@ -407,25 +467,8 @@ func (d *BaseDialect) BuildSelect(q *SelectQuery) (string, []interface{}, error)
 		b.WriteString(strings.Join(q.orderBy, ", "))
 	}
 
-	if d.LimitStyle == FetchNextStyle && (q.limit != nil || q.offset != nil) {
-		if len(q.orderBy) == 0 {
-			b.WriteString(" ORDER BY (SELECT NULL)")
-		}
-		if q.offset != nil {
-			fmt.Fprintf(&b, " OFFSET %d ROWS", *q.offset)
-		} else {
-			b.WriteString(" OFFSET 0 ROWS")
-		}
-		if q.limit != nil {
-			fmt.Fprintf(&b, " FETCH NEXT %d ROWS ONLY", *q.limit)
-		}
-	} else {
-		if q.limit != nil {
-			fmt.Fprintf(&b, " LIMIT %d", *q.limit)
-		}
-		if q.offset != nil {
-			fmt.Fprintf(&b, " OFFSET %d", *q.offset)
-		}
+	if q.limit != nil || q.offset != nil {
+		d.AppendLimit(&b, q.orderBy, q.limit, q.offset)
 	}
 
 	return b.String(), args, nil
@@ -441,31 +484,34 @@ func (d *BaseDialect) BuildInsert(q *InsertQuery) (string, []interface{}, error)
 	}
 
 	var b strings.Builder
+	quoted := d.quoteColumns(q.keys)
 
 	if len(q.rows) == 0 {
 		placeholders := make([]string, len(q.keys))
 		for i := range placeholders {
-			placeholders[i] = d.placeholder(i + 1)
+			placeholders[i] = d.Placeholder(i + 1)
 		}
 
-		quoted := d.quoteColumns(q.keys)
 		b.WriteString("INSERT INTO ")
 		b.WriteString(d.QuoteIdentifier(q.table))
 		b.WriteString(" (")
 		b.WriteString(quoted)
 		b.WriteString(")")
 
-		if len(q.returning) > 0 && d.PlaceholderStyle == AtPNumber {
-			b.WriteString(" ")
-			b.WriteString(d.buildOutput(q.returning))
+		if len(q.returning) > 0 {
+			if d.PrependReturning != nil {
+				d.PrependReturning(&b, q.returning)
+			}
 		}
 
 		b.WriteString(" VALUES (")
 		b.WriteString(strings.Join(placeholders, ", "))
 		b.WriteString(")")
 
-		if len(q.returning) > 0 && d.PlaceholderStyle != AtPNumber {
-			b.WriteString(d.buildReturning(q.returning))
+		if len(q.returning) > 0 {
+			if d.PrependReturning == nil && d.AppendReturning != nil {
+				d.AppendReturning(&b, q.returning)
+			}
 		}
 
 		return b.String(), q.values, nil
@@ -477,14 +523,12 @@ func (d *BaseDialect) BuildInsert(q *InsertQuery) (string, []interface{}, error)
 		}
 	}
 
-	quoted := d.quoteColumns(q.keys)
-
 	var allPlaceholders []string
 	var allArgs []interface{}
 	for rowIdx, row := range q.rows {
 		rowPhs := make([]string, len(q.keys))
 		for i := range q.keys {
-			rowPhs[i] = d.placeholder(rowIdx*len(q.keys) + i + 1)
+			rowPhs[i] = d.Placeholder(rowIdx*len(q.keys) + i + 1)
 		}
 		allPlaceholders = append(allPlaceholders, "("+strings.Join(rowPhs, ", ")+")")
 		allArgs = append(allArgs, row...)
@@ -496,16 +540,19 @@ func (d *BaseDialect) BuildInsert(q *InsertQuery) (string, []interface{}, error)
 	b.WriteString(quoted)
 	b.WriteString(")")
 
-	if len(q.returning) > 0 && d.PlaceholderStyle == AtPNumber {
-		b.WriteString(" ")
-		b.WriteString(d.buildOutput(q.returning))
+	if len(q.returning) > 0 {
+		if d.PrependReturning != nil {
+			d.PrependReturning(&b, q.returning)
+		}
 	}
 
 	b.WriteString(" VALUES ")
 	b.WriteString(strings.Join(allPlaceholders, ", "))
 
-	if len(q.returning) > 0 && d.PlaceholderStyle != AtPNumber {
-		b.WriteString(d.buildReturning(q.returning))
+	if len(q.returning) > 0 {
+		if d.PrependReturning == nil && d.AppendReturning != nil {
+			d.AppendReturning(&b, q.returning)
+		}
 	}
 
 	return b.String(), allArgs, nil
@@ -523,7 +570,7 @@ func (d *BaseDialect) BuildUpdate(q *UpdateQuery) (string, []interface{}, error)
 	var b strings.Builder
 	setClauses := make([]string, len(q.keys))
 	for i, key := range q.keys {
-		setClauses[i] = fmt.Sprintf("%s = %s", d.QuoteIdentifier(key), d.placeholder(i+1))
+		setClauses[i] = fmt.Sprintf("%s = %s", d.QuoteIdentifier(key), d.Placeholder(i+1))
 	}
 
 	b.WriteString("UPDATE ")
@@ -547,11 +594,8 @@ func (d *BaseDialect) BuildUpdate(q *UpdateQuery) (string, []interface{}, error)
 	}
 
 	if len(q.returning) > 0 {
-		if d.PlaceholderStyle == AtPNumber {
-			b.WriteString(" ")
-			b.WriteString(d.buildOutput(q.returning))
-		} else {
-			b.WriteString(d.buildReturning(q.returning))
+		if len(q.returning) > 0 && d.AppendReturning != nil {
+			d.AppendReturning(&b, q.returning)
 		}
 	}
 
@@ -586,31 +630,12 @@ func (d *BaseDialect) BuildDelete(q *DeleteQuery) (string, []interface{}, error)
 	}
 
 	if len(q.returning) > 0 {
-		if d.PlaceholderStyle == AtPNumber {
-			b.WriteString(" ")
-			b.WriteString(d.buildOutput(q.returning))
-		} else {
-			b.WriteString(d.buildReturning(q.returning))
+		if len(q.returning) > 0 && d.AppendReturning != nil {
+			d.AppendReturning(&b, q.returning)
 		}
 	}
 
 	return b.String(), args, nil
-}
-
-func (d *BaseDialect) buildReturning(columns []string) string {
-	quoted := make([]string, len(columns))
-	for i, c := range columns {
-		quoted[i] = d.QuoteIdentifier(c)
-	}
-	return " RETURNING " + strings.Join(quoted, ", ")
-}
-
-func (d *BaseDialect) buildOutput(columns []string) string {
-	quoted := make([]string, len(columns))
-	for i, c := range columns {
-		quoted[i] = "INSERTED." + d.QuoteIdentifier(c)
-	}
-	return "OUTPUT " + strings.Join(quoted, ", ")
 }
 
 // SafeIdentifier validates that a name is a safe SQL identifier (letters, digits, underscores, dots).
@@ -633,21 +658,6 @@ func SafeIdentifier(name string) error {
 		}
 	}
 	return nil
-}
-
-// JoinIdentifiers safely quotes and joins identifiers with a separator,
-// validating each one first.
-func JoinIdentifiers(dialect Dialect, sep string, names ...string) (string, error) {
-	for _, n := range names {
-		if err := SafeIdentifier(n); err != nil {
-			return "", err
-		}
-	}
-	quoted := make([]string, len(names))
-	for i, n := range names {
-		quoted[i] = dialect.QuoteIdentifier(n)
-	}
-	return strings.Join(quoted, sep), nil
 }
 
 // ErrNotImplemented is returned for features not yet implemented.

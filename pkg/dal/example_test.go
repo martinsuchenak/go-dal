@@ -7,7 +7,10 @@ import (
 )
 
 func Example_queryBuilder() {
-	d := &dal.BaseDialect{PlaceholderStyle: dal.QuestionMark, LimitStyle: dal.LimitOffsetStyle}
+	d := &dal.BaseDialect{
+		Placeholder: dal.QuestionMarkPlaceholder,
+		AppendLimit: dal.LimitOffset,
+	}
 	qb := dal.NewQueryBuilder(d)
 
 	query, args, err := qb.Select("id", "name").
@@ -18,11 +21,11 @@ func Example_queryBuilder() {
 		Limit(10).
 		Offset(5).
 		Build()
+
 	if err != nil {
 		fmt.Println("error:", err)
 		return
 	}
-
 	fmt.Println(query)
 	fmt.Println(args)
 	// Output:
@@ -31,18 +34,21 @@ func Example_queryBuilder() {
 }
 
 func Example_insertQuery() {
-	d := &dal.BaseDialect{PlaceholderStyle: dal.QuestionMark, LimitStyle: dal.LimitOffsetStyle}
+	d := &dal.BaseDialect{
+		Placeholder: dal.QuestionMarkPlaceholder,
+		AppendLimit: dal.LimitOffset,
+	}
 	qb := dal.NewQueryBuilder(d)
 
 	query, args, err := qb.Insert("users").
 		Set("name", "John").
 		Set("email", "john@example.com").
 		Build()
+
 	if err != nil {
 		fmt.Println("error:", err)
 		return
 	}
-
 	fmt.Println(query)
 	fmt.Println(args)
 	// Output:
@@ -51,18 +57,21 @@ func Example_insertQuery() {
 }
 
 func Example_updateQuery() {
-	d := &dal.BaseDialect{PlaceholderStyle: dal.QuestionMark, LimitStyle: dal.LimitOffsetStyle}
+	d := &dal.BaseDialect{
+		Placeholder: dal.QuestionMarkPlaceholder,
+		AppendLimit: dal.LimitOffset,
+	}
 	qb := dal.NewQueryBuilder(d)
 
 	query, args, err := qb.Update("users").
 		Set("email", "new@example.com").
 		Where("id = ?", 1).
 		Build()
+
 	if err != nil {
 		fmt.Println("error:", err)
 		return
 	}
-
 	fmt.Println(query)
 	fmt.Println(args)
 	// Output:
@@ -71,17 +80,20 @@ func Example_updateQuery() {
 }
 
 func Example_deleteQuery() {
-	d := &dal.BaseDialect{PlaceholderStyle: dal.QuestionMark, LimitStyle: dal.LimitOffsetStyle}
+	d := &dal.BaseDialect{
+		Placeholder: dal.QuestionMarkPlaceholder,
+		AppendLimit: dal.LimitOffset,
+	}
 	qb := dal.NewQueryBuilder(d)
 
 	query, args, err := qb.Delete("users").
 		Where("active = ?", false).
 		Build()
+
 	if err != nil {
 		fmt.Println("error:", err)
 		return
 	}
-
 	fmt.Println(query)
 	fmt.Println(args)
 	// Output:
@@ -90,7 +102,10 @@ func Example_deleteQuery() {
 }
 
 func Example_selectWithJoin() {
-	d := &dal.BaseDialect{PlaceholderStyle: dal.QuestionMark, LimitStyle: dal.LimitOffsetStyle}
+	d := &dal.BaseDialect{
+		Placeholder: dal.QuestionMarkPlaceholder,
+		AppendLimit: dal.LimitOffset,
+	}
 	qb := dal.NewQueryBuilder(d)
 
 	query, args, err := qb.Select("u.name", "o.total").
@@ -99,11 +114,11 @@ func Example_selectWithJoin() {
 		Where("o.total > ?", 100).
 		OrderBy("o.total DESC").
 		Build()
+
 	if err != nil {
 		fmt.Println("error:", err)
 		return
 	}
-
 	fmt.Println(query)
 	fmt.Println(args)
 	// Output:
@@ -112,7 +127,10 @@ func Example_selectWithJoin() {
 }
 
 func Example_postgresPlaceholders() {
-	d := &dal.BaseDialect{PlaceholderStyle: dal.DollarNumber, LimitStyle: dal.LimitOffsetStyle}
+	d := &dal.BaseDialect{
+		Placeholder: dal.DollarPlaceholder,
+		AppendLimit: dal.LimitOffset,
+	}
 	qb := dal.NewQueryBuilder(d)
 
 	query, args, err := qb.Select("id").
@@ -120,11 +138,11 @@ func Example_postgresPlaceholders() {
 		Where("active = ?", true).
 		Where("age > ?", 18).
 		Build()
+
 	if err != nil {
 		fmt.Println("error:", err)
 		return
 	}
-
 	fmt.Println(query)
 	fmt.Println(args)
 	// Output:
@@ -133,7 +151,10 @@ func Example_postgresPlaceholders() {
 }
 
 func Example_mssqlPlaceholders() {
-	d := &dal.BaseDialect{PlaceholderStyle: dal.AtPNumber, LimitStyle: dal.FetchNextStyle}
+	d := &dal.BaseDialect{
+		Placeholder: dal.AtPPlaceholder,
+		AppendLimit: dal.FetchNextLimit,
+	}
 	qb := dal.NewQueryBuilder(d)
 
 	query, args, err := qb.Select("id", "name").
@@ -142,11 +163,11 @@ func Example_mssqlPlaceholders() {
 		Limit(10).
 		Offset(20).
 		Build()
+
 	if err != nil {
 		fmt.Println("error:", err)
 		return
 	}
-
 	fmt.Println(query)
 	fmt.Println(args)
 	// Output:

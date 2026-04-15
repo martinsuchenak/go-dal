@@ -20,7 +20,7 @@ brew install go-task
 go-dal/
 ├── pkg/
 │   ├── dal/                    # Core: types, query builder, dialect, logging
-│   │   ├── types.go            # DBInterface, PlaceholderStyle, query structs
+│   │   ├── types.go            # DBInterface, query structs, error sentinels
 │   │   ├── query_builder.go    # QueryBuilder, fluent methods, In() helper
 │   │   ├── dialect.go          # Dialect interface, BaseDialect, QuoteIdentifier
 │   │   └── logger.go           # Logger interface, NoopLogger, BaseDB, Tx
@@ -110,20 +110,20 @@ QueryBuilder.Select("name").From("users").Where("id = ?", 1).Build()
 SelectQuery.Build() ──► dialect.BuildSelect(q)
   │
   ▼
-BaseDialect.BuildSelect() ──► "SELECT `name` FROM `users` WHERE id = ?", []interface{}{1}
+BaseDialect.BuildSelect() ──► "SELECT `name` FROM `users` WHERE id = ?", []interface{}{1}, nil
   │
   ▼
 MySQLDB.Query(ctx, query, args...) ──► BaseDB.Query() ──► *sql.DB.QueryContext()
-                                       │
-                                       └── logs at Debug/Error levels
+                                        │
+                                        └── logs at Debug/Error levels
 ```
 
 ### Why Drivers Are So Small
 
-Each driver is ~26 lines because:
+Each driver is ~27 lines because:
 
 - **`BaseDB` embedding** — Go's method promotion means `MySQLDB` automatically has Exec, Query, QueryRow, BeginTx, Ping, Close, SetLogger, DB. No forwarding methods needed.
-- **`BaseDialect` configuration** — all SQL generation is in one place. Each driver just provides a 3-field config.
+- **`BaseDialect` configuration** — all SQL generation is in one place. Each driver just provides a function-field config.
 
 ---
 
@@ -151,13 +151,9 @@ type YourDB struct {
     *dal.BaseDB
 }
 
-// NewYourDB creates a new YourDB. Optional logger.
-func NewYourDB(db *sql.DB, log ...dal.Logger) *YourDB {
-    var logger dal.Logger
-    if len(log) > 0 {
-        logger = log[0]
-    }
-    return &YourDB{BaseDB: dal.NewBaseDB(db, logger)}
+// NewYourDB creates a new YourDB. Pass nil for log to disable logging.
+func NewYourDB(db *sql.DB, log dal.Logger) *YourDB {
+    return &YourDB{BaseDB: dal.NewBaseDB(db, log)}
 }
 ```
 
@@ -171,13 +167,19 @@ package yourdb
 import "github.com/martinsuchenak/go-dal/pkg/dal"
 
 func NewDialect() dal.Dialect {
-    return &dal.BaseDialect{
-        PlaceholderStyle: dal.QuestionMark,   // or DollarNumber, AtPNumber
-        LimitStyle:       dal.LimitOffsetStyle, // or FetchNextStyle
-        QuoteStyle:       dal.DoubleQuoteQuoting, // or BacktickQuoting, BracketQuoting, NoQuoting
+    d := &dal.BaseDialect{
+        Placeholder: dal.QuestionMarkPlaceholder, // or DollarPlaceholder, AtPPlaceholder
+        AppendLimit: dal.LimitOffset,             // or FetchNextLimit
+        QuoteStyle:  dal.DoubleQuoteQuoting,      // or BacktickQuoting, BracketQuoting, NoQuoting
     }
+    // Enable RETURNING if supported:
+    // d.AppendReturning = d.WriteReturning   // PostgreSQL/SQLite style
+    // d.PrependReturning = d.WriteOutput     // MSSQL style (before VALUES)
+    return d
 }
 ```
+
+The function-field pattern (`Placeholder`, `AppendLimit`, `AppendReturning`, `PrependReturning`) is more extensible than enum-based approaches — you can provide a custom function for databases with unique placeholder, LIMIT, or RETURNING syntax without modifying core code.
 
 ### 3. Add NewQueryBuilder
 
@@ -198,7 +200,7 @@ type YourDialect struct {
     dal.BaseDialect
 }
 
-func (d *YourDialect) BuildInsert(q *dal.InsertQuery) (string, []interface{}) {
+func (d *YourDialect) BuildInsert(q *dal.InsertQuery) (string, []interface{}, error) {
     // custom INSERT rendering
     // you can call d.BaseDialect.BuildInsert(q) for the default behavior
     // and then modify the result
@@ -209,13 +211,15 @@ Then use your custom dialect in `NewDialect()`:
 
 ```go
 func NewDialect() dal.Dialect {
-    return &YourDialect{
+    d := &YourDialect{
         BaseDialect: dal.BaseDialect{
-            PlaceholderStyle: dal.QuestionMark,
-            LimitStyle:       dal.LimitOffsetStyle,
-            QuoteStyle:       dal.DoubleQuoteQuoting,
+            Placeholder: dal.DollarPlaceholder,
+            AppendLimit: dal.LimitOffset,
+            QuoteStyle:  dal.DoubleQuoteQuoting,
         },
     }
+    d.AppendReturning = d.WriteReturning
+    return d
 }
 ```
 
@@ -231,9 +235,12 @@ import (
     "github.com/martinsuchenak/go-dal/pkg/dal"
 )
 
-func TestNewQueryBuilderUsesQuestionMark(t *testing.T) {
+func TestNewQueryBuilderUsesCorrectPlaceholders(t *testing.T) {
     qb := NewQueryBuilder()
-    query, args := qb.Insert("users").Set("name", "John").Build()
+    query, args, err := qb.Insert("users").Set("name", "John").Build()
+    if err != nil {
+        t.Fatal(err)
+    }
 
     expected := `INSERT INTO "users" ("name") VALUES (?)`
     if query != expected {
@@ -263,6 +270,7 @@ Add a service to `docker-compose.test.yml` for your database, then add connectio
 - **Fluent API** — all query builder methods return `*XxxQuery` for chaining
 - **Quote-aware** — placeholder replacement must skip `?` inside string literals
 - **Table-driven tests** — use subtests with `t.Run()` for multi-database test cases
+- **Handle errors** — `Build()` and `In()` now return errors; always check them
 
 ## Available Taskfile Commands
 
