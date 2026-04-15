@@ -47,6 +47,15 @@ func TestInterfaceCompliance(t *testing.T) {
 	var _ dal.DBInterface = (*MySQLDB)(nil)
 }
 
+func TestTranslateSQL(t *testing.T) {
+	d := NewDialect()
+	got := d.TranslateSQL("UPDATE users SET x = ? WHERE id = ?")
+	want := "UPDATE users SET x = ? WHERE id = ?"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 func TestExpressionDefaults(t *testing.T) {
 	d := NewDialect()
 	if got := d.ConcatExpr("a", "b"); got != "CONCAT(a, b)" {

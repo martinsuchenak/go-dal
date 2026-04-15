@@ -65,3 +65,12 @@ func TestExpressionOverrides(t *testing.T) {
 		t.Errorf("RandExpr = %q, want RANDOM()", got)
 	}
 }
+
+func TestTranslateSQL(t *testing.T) {
+	d := NewDialect()
+	got := d.TranslateSQL("UPDATE users SET x = ? WHERE id = ?")
+	want := "UPDATE users SET x = ? WHERE id = ?"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}

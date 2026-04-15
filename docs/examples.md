@@ -496,6 +496,29 @@ if err != nil {
 
 ---
 
+## Raw SQL with TranslateSQL
+
+For SQL that can't be expressed through the query builder (column expressions, subqueries), use `TranslateSQL` to keep placeholders portable:
+
+### Column expression
+
+```go
+query := qb.TranslateSQL(
+    "UPDATE users SET failed_login_attempts=failed_login_attempts+1, updated_at=" + qb.CurrentTimestamp() + " WHERE id = ?",
+)
+result, err := db.Exec(ctx, query, userID)
+```
+
+### Subquery
+
+```go
+query := qb.TranslateSQL("SELECT EXISTS(SELECT 1 FROM users WHERE email = ? AND active = ?)")
+var exists bool
+err := db.QueryRow(ctx, query, email, true).Scan(&exists)
+```
+
+---
+
 ## Logging Examples
 
 ### With a custom logger

@@ -82,3 +82,10 @@ func (qb *QueryBuilder) StringAggExpr(col, sep string) string {
 func (qb *QueryBuilder) RandExpr() string {
 	return qb.dialect.RandExpr()
 }
+
+// TranslateSQL replaces ? placeholders in raw SQL with the dialect's format.
+// Useful for SQL that can't be expressed through the query builder
+// (e.g., column expressions, subqueries).
+func (qb *QueryBuilder) TranslateSQL(query string) string {
+	return qb.dialect.TranslateSQL(query)
+}

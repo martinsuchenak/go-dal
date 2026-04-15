@@ -456,6 +456,7 @@ type Dialect interface {
     BuildDelete(q *DeleteQuery) (string, []interface{}, error)
     QuoteIdentifier(name string) string
     SupportsReturning() bool
+    TranslateSQL(query string) string
     ConcatExpr(parts ...string) string
     LengthExpr(col string) string
     CurrentTimestamp() string
@@ -514,6 +515,34 @@ The translation is **quote-aware** — `?` inside single-quoted or double-quoted
 ```go
 qb.Where("name = '?' AND id = ?", 42)
 // PostgreSQL: WHERE name = '?' AND id = $1
+```
+
+### TranslateSQL
+
+For SQL that can't be expressed through the query builder (e.g., column expressions like `col=col+1`, subqueries like `SELECT EXISTS(...)`), use `TranslateSQL` to translate `?` placeholders to the dialect's format:
+
+```go
+// Column expression — can't use Set() for col=col+1
+query := qb.TranslateSQL("UPDATE users SET failed_login_attempts=failed_login_attempts+1, updated_at=" + qb.CurrentTimestamp() + " WHERE id = ?")
+result, err := db.Exec(ctx, query, userID)
+
+// Subquery
+query := qb.TranslateSQL("SELECT EXISTS(SELECT 1 FROM users WHERE email = ? AND active = ?)")
+var exists bool
+db.QueryRow(ctx, query, email, true).Scan(&exists)
+```
+
+| Dialect | Input | Output |
+|---------|-------|--------|
+| MySQL / SQLite | `WHERE id = ?` | `WHERE id = ?` |
+| PostgreSQL | `WHERE id = ?` | `WHERE id = $1` |
+| SQL Server | `WHERE id = ?` | `WHERE id = @p1` |
+
+Like the query builder, `TranslateSQL` is quote-aware and skips `?` inside string literals. It's available on both `Dialect` and `QueryBuilder`:
+
+```go
+dialect.TranslateSQL(query)  // on the dialect directly
+qb.TranslateSQL(query)       // convenience wrapper
 ```
 
 ### Identifier Quoting

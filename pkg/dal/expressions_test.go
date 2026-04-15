@@ -52,3 +52,93 @@ func TestRandExpr(t *testing.T) {
 		t.Errorf("got %q, want RAND()", got)
 	}
 }
+
+func TestTranslateSQLQuestionMark(t *testing.T) {
+	d := &BaseDialect{Placeholder: QuestionMarkPlaceholder}
+	got := d.TranslateSQL("UPDATE users SET x = ? WHERE id = ?")
+	want := "UPDATE users SET x = ? WHERE id = ?"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTranslateSQLDollar(t *testing.T) {
+	d := &BaseDialect{Placeholder: DollarPlaceholder}
+	got := d.TranslateSQL("UPDATE users SET x = ? WHERE id = ? AND name = ?")
+	want := "UPDATE users SET x = $1 WHERE id = $2 AND name = $3"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTranslateSQLAtP(t *testing.T) {
+	d := &BaseDialect{Placeholder: AtPPlaceholder}
+	got := d.TranslateSQL("UPDATE users SET x = ? WHERE id = ?")
+	want := "UPDATE users SET x = @p1 WHERE id = @p2"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTranslateSQLSkipsQuotedPlaceholders(t *testing.T) {
+	d := &BaseDialect{Placeholder: DollarPlaceholder}
+	got := d.TranslateSQL("UPDATE users SET x = ? WHERE name = '?' AND id = ?")
+	want := "UPDATE users SET x = $1 WHERE name = '?' AND id = $2"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTranslateSQLDoubleQuoted(t *testing.T) {
+	d := &BaseDialect{Placeholder: DollarPlaceholder}
+	got := d.TranslateSQL(`UPDATE users SET x = ? WHERE col = "?" AND id = ?`)
+	want := `UPDATE users SET x = $1 WHERE col = "?" AND id = $2`
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTranslateSQLEscapedQuotes(t *testing.T) {
+	d := &BaseDialect{Placeholder: DollarPlaceholder}
+	got := d.TranslateSQL("UPDATE users SET x = ? WHERE name = 'it''s ?' AND id = ?")
+	want := "UPDATE users SET x = $1 WHERE name = 'it''s ?' AND id = $2"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTranslateSQLBackslashEscapes(t *testing.T) {
+	d := &BaseDialect{Placeholder: QuestionMarkPlaceholder, BackslashEscapes: true}
+	got := d.TranslateSQL("UPDATE users SET x = ? WHERE name = 'it\\'s ?' AND id = ?")
+	want := "UPDATE users SET x = ? WHERE name = 'it\\'s ?' AND id = ?"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTranslateSQLNoPlaceholders(t *testing.T) {
+	d := &BaseDialect{Placeholder: DollarPlaceholder}
+	got := d.TranslateSQL("SELECT NOW()")
+	want := "SELECT NOW()"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTranslateSQLViaQueryBuilder(t *testing.T) {
+	qb := NewQueryBuilder(dollarDialect())
+	got := qb.TranslateSQL("UPDATE users SET x = ? WHERE id = ?")
+	want := "UPDATE users SET x = $1 WHERE id = $2"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTranslateSQLSubquery(t *testing.T) {
+	d := &BaseDialect{Placeholder: DollarPlaceholder}
+	got := d.TranslateSQL("SELECT EXISTS(SELECT 1 FROM users WHERE email = ? AND active = ?)")
+	want := "SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 AND active = $2)"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}

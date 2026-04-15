@@ -58,6 +58,7 @@ type Dialect interface {
 	BuildDelete(q *DeleteQuery) (string, []interface{}, error)
 	QuoteIdentifier(name string) string
 	SupportsReturning() bool
+	TranslateSQL(query string) string
 	ConcatExpr(parts ...string) string
 	LengthExpr(col string) string
 	CurrentTimestamp() string
@@ -118,6 +119,16 @@ func (d *BaseDialect) SupportsReturning() bool {
 }
 
 // isQuestionMark returns true when the placeholder function produces bare "?".
+// TranslateSQL replaces ? placeholders in raw SQL with the dialect's format
+// ($1, $2... for PostgreSQL; @p1, @p2... for MSSQL; unchanged for MySQL/SQLite).
+// Placeholders inside single- or double-quoted string literals are left alone.
+// Use this for SQL that can't be expressed through the query builder
+// (e.g., column expressions like col=col+1, subqueries).
+func (d *BaseDialect) TranslateSQL(query string) string {
+	translated, _ := d.replaceAndCount(query, 1)
+	return translated
+}
+
 func (d *BaseDialect) isQuestionMark() bool {
 	return d.Placeholder(1) == "?"
 }
