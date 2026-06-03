@@ -8,7 +8,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/microsoft/go-mssqldb"
 
 	"github.com/martinsuchenak/xdal/pkg/xdal"
@@ -85,7 +85,7 @@ func setupAllDBs(t *testing.T) []*testDB {
 	})
 
 	// PostgreSQL
-	pgDB := connectWithRetry(t, "postgres", "postgres://xdal:testpass@localhost:15432/xdal_test?sslmode=disable", 10*time.Second)
+	pgDB := connectWithRetry(t, "pgx", "postgres://xdal:testpass@localhost:15432/xdal_test?sslmode=disable", 10*time.Second)
 	pgDalDB := postgres.NewPostgresDB(pgDB, nil)
 	pgQB := postgres.NewQueryBuilder()
 	dbs = append(dbs, &testDB{
