@@ -27,14 +27,14 @@ services:
       retries: 10
 
   mssql:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: mcr.microsoft.com/azure-sql-edge
     ports:
       - "11433:1433"
     environment:
       ACCEPT_EULA: Y
       MSSQL_SA_PASSWORD: "TestPass123!"
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'TestPass123!' -C -Q 'SELECT 1'"]
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/1433'"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
